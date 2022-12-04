@@ -1,0 +1,115 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+# The AWSTemplateFormatVersion identifies the capabilities of the template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  keeb-bot
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform:
+- AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        Region: 'us-east-1'
+
+# Resources declares the AWS resources that you want to include in the stack
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+Resources:
+  # Each Lambda function is defined by properties:
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+
+  # This is a Lambda function config associated with the source code: get-all-items.js
+  ShopifySynchronizationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/shopify-handler.shopifySynchronizationHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: Scans Shopify sites and writes updates to a DynamoDB table
+      Policies:
+        # Give Create/Read/Update/Delete Permissions to the ShopifyStockTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ShopifyStockTable
+      Environment:
+        Variables:
+          # Make table name accessible as environment variable from function code during execution
+          KEEB_STOCK_TABLE: !Ref ShopifyStockTable
+          SHOPIFY_SITES: "[\"https://shop.norbauer.com/products/norbazaar-rare-and-sundry-topre-aftermarket-housings.js\",\"https://shop.norbauer.com/products/the-heavy-grail-hhkb-housing.js\",\"https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition.js\"]"
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /
+            Method: GET
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(4 minutes)
+            Name: ShopifySynchronizationSchedule
+            Description: Schedules the ShopifySynchronizationFunction to run every 4 minutes
+            Enabled: true
+            RetryPolicy:
+                MaximumEventAgeInSeconds: 86400
+                MaximumRetryAttempts: 185
+
+  # This is a Lambda function config associated with the source code: discord-handler.js
+  DiscordNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/discord-handler.discordNotificationHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256 # 128
+      Timeout: 100
+      Description: Sends a Discord notification when a product is available
+      Policies:
+        # Give Create/Read/Update/Delete Permissions to the ShopifyStockTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ShopifyStockTable
+      Environment:
+        Variables:
+          # Make table name accessible as environment variable from function code during execution
+          KEEB_STOCK_TABLE: !Ref ShopifyStockTable
+          DISCORD_API_PATH: "/api/webhooks/1045794458228236348/Bl_b9FiHVno8orohzPQiyMhyniDHOzhiuxIkQUxkikadjUf8wBwbAjlv7CnYHkzpWvI5"
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /
+            Method: POST
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Name: DiscordNotificationSchedule
+            Description: Schedules the DiscordNotificationFunction to run every 4 minutes
+            Enabled: true
+            RetryPolicy:
+                MaximumEventAgeInSeconds: 86400
+                MaximumRetryAttempts: 185
+
+  # DynamoDB table to store item: {id: &lt;ID&gt;, name: &lt;NAME&gt;}
+  ShopifyStockTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+
+Outputs:
+  WebEndpoint:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
