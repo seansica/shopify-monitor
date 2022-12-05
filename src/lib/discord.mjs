@@ -13,7 +13,8 @@ export async function postToDiscord (path, messageContent) {
   }
 
   const body = {
-    content: JSON.stringify(messageContent)
+    content: prettifyMessage(messageContent),
+    username: discordUsername()
   };
 
   const options = {
@@ -38,7 +39,28 @@ export async function postToDiscord (path, messageContent) {
   }
 }
 
-export function prettifyMessage (message) {
+function discordUsername () {
+  const seed = Math.floor(Math.random() * 10); // random integer from 0 to 9
+
+  // 0 to 2
+  if (seed >= 0 && seed < 3) {
+    return 'Keebot';
+  }
+  // 3 to 5
+  if (seed >= 3 && seed < 6) {
+    return 'Keebotron';
+  }
+  // 6 to 7
+  if (seed >= 6 && seed < 8) {
+    return 'Norbot';
+  }
+  // 8 to 9
+  if (seed >= 8 && seed < 10) {
+    return 'Thocotron';
+  }
+}
+
+function prettifyMessage (message) {
   if ('title' in message &&
       'quantity' in message &&
       'site' in message) {
