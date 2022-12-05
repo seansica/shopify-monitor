@@ -53,9 +53,9 @@ Resources:
         Schedule:
           Type: Schedule
           Properties:
-            Schedule: rate(4 minutes)
+            Schedule: rate(5 minutes)
             Name: ShopifySynchronizationSchedule
-            Description: Schedules the ShopifySynchronizationFunction to run every 4 minutes
+            Description: Schedules the ShopifySynchronizationFunction to run every 5 minutes
             Enabled: true
             RetryPolicy:
                 MaximumEventAgeInSeconds: 86400
@@ -76,6 +76,10 @@ Resources:
         # Give Create/Read/Update/Delete Permissions to the ShopifyStockTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ShopifyStockTable
+        # Enable Function to perform DescribeStream, GetRecords, GetShardIterator, ListStreams actions on the table
+        - DynamoDBStreamReadPolicy:
+            TableName: !Ref ShopifyStockTable
+            StreamName: !GetAtt ShopifyStockTable.StreamArn
       Environment:
         Variables:
           # Make table name accessible as environment variable from function code during execution
@@ -87,27 +91,66 @@ Resources:
           Properties:
             Path: /
             Method: POST
-        Schedule:
-          Type: Schedule
+        DDBEvent:
+          Type: DynamoDB
           Properties:
-            Schedule: rate(5 minutes)
-            Name: DiscordNotificationSchedule
-            Description: Schedules the DiscordNotificationFunction to run every 4 minutes
+            Stream: !GetAtt ShopifyStockTable.StreamArn
+            FilterCriteria:
+              Filters: 
+                - Pattern: "{\"dynamodb\":{\"NewImage\":{\"quantity\":{\"numeric\":[\">\",\"0\"]},\"available\":{\"S\":[\"true\"]}}}}"
+                # - Pattern: "{\"quantity\":[{\"numeric\":[\">\",0]}]}"
+                # - Pattern: '{ \"dynamodb\": { \"Keys\": { \"quantity\": { \"numeric\": [ \">\": \"0\" ] } } } }'
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
             Enabled: true
-            RetryPolicy:
-                MaximumEventAgeInSeconds: 86400
-                MaximumRetryAttempts: 185
+        # Schedule:
+        #   Type: Schedule
+        #   Properties:
+        #     Schedule: rate(5 minutes)
+        #     Name: DiscordNotificationSchedule
+        #     Description: Schedules the DiscordNotificationFunction to run every 4 minutes
+        #     Enabled: true
+        #     RetryPolicy:
+        #         MaximumEventAgeInSeconds: 86400
+        #         MaximumRetryAttempts: 185
 
   # DynamoDB table to store item: {id: &lt;ID&gt;, name: &lt;NAME&gt;}
+  # ShopifyStockTable:
+  #   Type: AWS::Serverless::SimpleTable
+  #   Properties:
+  #     PrimaryKey:
+  #       Name: id
+  #       Type: String
+  #     ProvisionedThroughput:
+  #       ReadCapacityUnits: 2
+  #       WriteCapacityUnits: 2
+
   ShopifyStockTable:
-    Type: AWS::Serverless::SimpleTable
+    Type: AWS::DynamoDB::Table
     Properties:
-      PrimaryKey:
-        Name: id
-        Type: String
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
       ProvisionedThroughput:
         ReadCapacityUnits: 2
         WriteCapacityUnits: 2
+  
+  # EventSourceDDBTableStream:
+  #   Type: AWS::Lambda::EventSourceMapping
+  #   Properties:
+  #     BatchSize: 1
+  #     Enabled: True
+  #     FilterCriteria:
+  #       Filters:
+  #         - Pattern: "{\"dynamodb\":{\"NewImage\":{\"quantity\":{\"numeric\":[\">\",\"0\"]},\"available\":{\"S\":[\"true\"]}}}}"
+  #     EventSourceArn: !GetAtt ShopifyStockTable.StreamArn
+  #     FunctionName: !GetAtt DiscordNotificationFunction.Arn
+  #     StartingPosition: TRIM_HORIZON
 
 Outputs:
   WebEndpoint:
