@@ -18,11 +18,11 @@ const sites = JSON.parse(process.env.SHOPIFY_SITES);
  * A simple example includes a HTTP get method to get all items from a DynamoDB table.
  */
 export const shopifySynchronizationHandler = async (event, context) => {
-  if (event.httpMethod !== 'GET') {
+  if ('httpMethod' in event && event.httpMethod !== 'GET') {
     throw new Error(`getAllItems only accept GET method, you tried: ${event.httpMethod}`);
   }
   // All log statements are written to CloudWatch
-  console.info('received:', event);
+  console.info('Received event:', event);
 
   let allItems = [];
   // FIRST, get the content from the Shopify site(s)
@@ -55,9 +55,28 @@ export const shopifySynchronizationHandler = async (event, context) => {
         await writeContentToDatabase(tableName, item);
       }
     }
-    return context.succeed(allItems);
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(allItems),
+      isBase64Encoded: false
+    };
+    // return context.succeed(res);
   } catch (err) {
     console.log(err.message);
-    return context.fail('Failed to handle Shopify content');
+    // return context.fail('Failed to handle Shopify content');
+    return {
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: 'Failed to handle Shopify content',
+        error: err.message
+      }),
+      isBase64Encoded: false
+    };
   }
 };

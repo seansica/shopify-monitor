@@ -1,4 +1,4 @@
-import { postToDiscord, prettifyMessage } from '../lib/discord.mjs';
+import { postToDiscord } from '../lib/discord.mjs';
 import { getAllItems } from '../lib/database.mjs';
 
 // Get the Discord webook URL path
@@ -9,33 +9,47 @@ const path = process.env.DISCORD_API_PATH;
 const tableName = process.env.KEEB_STOCK_TABLE;
 
 export const discordNotificationHandler = async (event, context) => {
-  if (event.httpMethod !== 'POST') {
+  if ('httpMethod' in event && event.httpMethod !== 'POST') {
     throw new Error(`postToDiscordHandler only accept POST method, you tried: ${event.httpMethod}`);
   }
   // All log statements are written to CloudWatch
   console.info('received:', event);
 
-  // first, get the content from the database
-  /** code here */
+  // get the content from the database
   const items = await getAllItems(tableName);
 
   console.debug(`Received ${items?.length} objects from database`);
 
-  // third, send the content to discord
+  // send the content to discord
   try {
     for (const item of items) {
       if (item.available) {
-        await postToDiscord(
-          path,
-          prettifyMessage(item) // second, format the content to render nicely as discord
-        );
+        await postToDiscord(path, item);
         console.debug('Discord notification succeeded');
       }
     }
 
-    return context.succeed('Keeb bot Discord notification succeeded');
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: 'Shopify bot successfully notified the Discord server'
+      }),
+      isBase64Encoded: false
+    };
   } catch (err) {
     console.log(err);
   }
-  return context.fail('Keeb bot Discord notification failed');
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      title: 'Shopify bot failed to notify the Discord server. Please inform the admin.'
+    }),
+    isBase64Encoded: false
+  };
 };
