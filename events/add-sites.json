@@ -1,0 +1,10 @@
+{
+  "httpMethod": "POST",
+  "multiValueQueryStringParameters": {
+    "site": [
+      "https://shop.norbauer.com/products/norbazaar-rare-and-sundry-topre-aftermarket-housings.js",
+      "https://shop.norbauer.com/products/the-heavy-grail-hhkb-housing.js",
+      "https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition.js"
+    ]
+  }
+}
