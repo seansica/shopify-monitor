@@ -16,15 +16,29 @@ The application uses several AWS resources, including Lambda functions, an API G
 ## Cheat Sheet
 
 ```bash
-# locally test 
-sudo sam local invoke "ShopifySynchronizationFunction" -e events/event-get-all-items.json
-sudo sam local invoke "postToDiscordFunction" -e events/event-post-item.json
+# test locally
+sudo sam local invoke "ShopifySyncFunction" -e events/event-get-all-items.json
+sudo sam local invoke "DiscordNotificationFunction" -e events/event-post-item.json
 
 # deploy
 sam deploy
+
+# update the Discord API key
+aws secretsmanager put-secret-value \
+    --secret-id DiscordApiKey \
+    --secret-string file://secrets.json
+    
+# monitor shopify sites to monitor
+curl -X POST https://your-slug.execute-api.us-east-1.amazonaws.com/Prod/config\
+  ?site=https://shopifySite1.com \
+  &site=https://shopifySite2.com \
 ```
 
+---
+
 ## Getting Started
+
+### Initial Deployment
 
 To use the AWS SAM CLI, you need the following tools:
 
@@ -36,6 +50,8 @@ To build and deploy your application for the first time, run the following in yo
 
 ```bash
 sam build
+
+# alternatively:
 sam deploy --guided
 ```
 
@@ -48,6 +64,60 @@ The first command will build the source of your application. The second command 
 * **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
 
 The API Gateway endpoint API will be displayed in the outputs when the deployment is complete.
+
+### Set the Discord API Key
+
+The initial Sam/CloudFormation stack deployment will automatically create a secret in AWS Secrets Manager in which the 
+Discord API will be stored. The value is set to an arbitrary placeholder, so make sure you change it before you start 
+using the app.  
+
+You can either login to the AWS Console to update the secret, _or_, if you have the AWS SDK installed, you can store the API key in the provided `secrets.template.json` file and push it as follows:
+```bash
+# copy the template to a file called secrets.json
+cp secrets.template.json secrets.json
+
+# edit the file using your preferred text editor
+
+# use the SDK to push the new value
+aws secretsmanager put-secret-value \
+    --secret-id DiscordApiKey \
+    --secret-string file://secrets.json
+```
+
+### Add Shopify websites
+
+Now you are ready to start monitoring some Shopify websites!
+
+The Shopify monitor determines which Shopify URLs to monitor based on `SITE` objects in the DynamoDB `ConfigTable`. On
+each synchronization event, the `ShopifySyncFunction` will extract all available URLs from this table and scrape them 
+for inventory data.
+
+Sites can be added via `POST /config?site=`. You can include multiple `site` query parameters in the same request.
+
+Here is an example using `curl`:
+
+```bash
+curl -X POST https://your-slug.execute-api.us-east-1.amazonaws.com/Prod/config\
+  ?site=https://shopifySite1.com \
+  &site=https://shopifySite2.com \
+```
+
+If you wish edit the DynamoDB `ConfigTable` using alternative means, note that Shopify site items use the following data 
+model. The `type: "SITE"` property is required.
+
+```json
+{
+  "name": "https://the-name-of-your-shopify-website",
+  "type": "SITE"
+}
+```
+
+---
+
+## AWS Sam CLI Notes
+
+
+
 
 ## Use the AWS SAM CLI to build and test locally
 
