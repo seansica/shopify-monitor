@@ -2,7 +2,7 @@
 
 This project contains source code and supporting files for a serverless Shopify monitoring application that you can deploy with the AWS Serverless Application Model (AWS SAM) command line interface (CLI). 
 
-![](docs/shopify-bot-updates.png)
+![](docs/shopify-bot.png)
 
 It includes the following files and folders:
 
@@ -186,3 +186,8 @@ To delete the sample application that you created, use the AWS CLI. Assuming you
 ```bash
 aws cloudformation delete-stack --stack-name keeb-bot
 ```
+
+## Visuals
+
+Here is a more detailed breakdown:
+![](docs/shopify-bot-updates.png)
