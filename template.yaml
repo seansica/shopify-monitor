@@ -1,14 +1,7 @@
-# This is the SAM template that represents the architecture of your serverless application
-# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
-
-# The AWSTemplateFormatVersion identifies the capabilities of the template
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  keeb-bot
+  shopify-bot
 
-# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
 Transform:
 - AWS::Serverless-2016-10-31
 
@@ -18,17 +11,37 @@ Globals:
       Variables:
         Region: 'us-east-1'
 
-# Resources declares the AWS resources that you want to include in the stack
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
 Resources:
-  # Each Lambda function is defined by properties:
-  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
 
-  # This is a Lambda function config associated with the source code: get-all-items.js
-  ShopifySynchronizationFunction:
+  ConfigFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/shopify-handler.shopifySynchronizationHandler
+      Handler: src/handlers/config-handler.configHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: Stores Shopify sites and Discord webhook parameters (excluding the secure API key - that is stored in Secrets Manager)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConfigTable
+      Environment:
+        Variables:
+          # The ConfigTable stores the list of Shopify sites that the ShopifySyncFunction will check
+          CONFIG_TABLE: !Ref ConfigTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /config
+            Method: POST
+
+  # This is a Lambda function config associated with the source code: get-all-items.js
+  ShopifySyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/shopify-handler.shopifySyncHandler
       Runtime: nodejs18.x
       Architectures:
         - x86_64
@@ -36,14 +49,17 @@ Resources:
       Timeout: 100
       Description: Scans Shopify sites and writes updates to a DynamoDB table
       Policies:
-        # Give Create/Read/Update/Delete Permissions to the ShopifyStockTable
+          # Give Create/Read/Update/Delete Permissions to the InventoryTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref ShopifyStockTable
+            TableName: !Ref InventoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConfigTable
       Environment:
         Variables:
-          # Make table name accessible as environment variable from function code during execution
-          KEEB_STOCK_TABLE: !Ref ShopifyStockTable
-          SHOPIFY_SITES: "[\"https://shop.norbauer.com/products/norbazaar-rare-and-sundry-topre-aftermarket-housings.js\",\"https://shop.norbauer.com/products/the-heavy-grail-hhkb-housing.js\",\"https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition.js\"]"
+          # The ConfigTable stores the list of Shopify sites that the ShopifySyncFunction will check
+          CONFIG_TABLE: !Ref ConfigTable
+          # The InventoryTable stores the product/stock items that were retrieved from the sites
+          INVENTORY_TABLE: !Ref InventoryTable
       Events:
         Api:
           Type: Api
@@ -54,8 +70,8 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: rate(5 minutes)
-            Name: ShopifySynchronizationSchedule
-            Description: Schedules the ShopifySynchronizationFunction to run every 5 minutes
+            Name: ShopifySyncSchedule
+            Description: Schedules the ShopifySyncFunction to run every 5 minutes
             Enabled: true
             RetryPolicy:
                 MaximumEventAgeInSeconds: 86400
@@ -73,59 +89,62 @@ Resources:
       Timeout: 100
       Description: Sends a Discord notification when a product is available
       Policies:
-        # Give Create/Read/Update/Delete Permissions to the ShopifyStockTable
+          # Give Create/Read/Update/Delete Permissions to the InventoryTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref ShopifyStockTable
-        # Enable Function to perform DescribeStream, GetRecords, GetShardIterator, ListStreams actions on the table
+            TableName: !Ref InventoryTable
+          # Enable Function to perform DescribeStream, GetRecords, GetShardIterator, ListStreams actions on the table
         - DynamoDBStreamReadPolicy:
-            TableName: !Ref ShopifyStockTable
-            StreamName: !GetAtt ShopifyStockTable.StreamArn
+            TableName: !Ref InventoryTable
+            StreamName: !GetAtt InventoryTable.StreamArn
+          # Enable Function to read Secret Manager store to retrieve Discord API key
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref DiscordApiKey
       Environment:
         Variables:
           # Make table name accessible as environment variable from function code during execution
-          KEEB_STOCK_TABLE: !Ref ShopifyStockTable
-          DISCORD_API_PATH: "/api/webhooks/1045794458228236348/Bl_b9FiHVno8orohzPQiyMhyniDHOzhiuxIkQUxkikadjUf8wBwbAjlv7CnYHkzpWvI5"
+          INVENTORY_TABLE: !Ref InventoryTable
+          DISCORD_SECRET_ARN: !Ref DiscordApiKey
       Events:
         Api:
           Type: Api
           Properties:
             Path: /
             Method: POST
-        DDBEvent:
+        StreamEvent:
           Type: DynamoDB
           Properties:
-            Stream: !GetAtt ShopifyStockTable.StreamArn
-            FilterCriteria:
-              Filters: 
-                - Pattern: "{\"dynamodb\":{\"NewImage\":{\"quantity\":{\"numeric\":[\">\",\"0\"]},\"available\":{\"S\":[\"true\"]}}}}"
-                # - Pattern: "{\"quantity\":[{\"numeric\":[\">\",0]}]}"
-                # - Pattern: '{ \"dynamodb\": { \"Keys\": { \"quantity\": { \"numeric\": [ \">\": \"0\" ] } } } }'
+            Stream: !GetAtt InventoryTable.StreamArn
             StartingPosition: TRIM_HORIZON
             BatchSize: 1
             Enabled: true
+        # Uncomment the Schedule event if you would prefer to automatically run the DiscordNotificationFunction on a regular schedule
         # Schedule:
         #   Type: Schedule
         #   Properties:
         #     Schedule: rate(5 minutes)
         #     Name: DiscordNotificationSchedule
-        #     Description: Schedules the DiscordNotificationFunction to run every 4 minutes
+        #     Description: Schedules the DiscordNotificationFunction to run every 5 minutes
         #     Enabled: true
         #     RetryPolicy:
         #         MaximumEventAgeInSeconds: 86400
         #         MaximumRetryAttempts: 185
 
-  # DynamoDB table to store item: {id: &lt;ID&gt;, name: &lt;NAME&gt;}
-  # ShopifyStockTable:
-  #   Type: AWS::Serverless::SimpleTable
-  #   Properties:
-  #     PrimaryKey:
-  #       Name: id
-  #       Type: String
-  #     ProvisionedThroughput:
-  #       ReadCapacityUnits: 2
-  #       WriteCapacityUnits: 2
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: name
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
 
-  ShopifyStockTable:
+  InventoryTable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
@@ -135,22 +154,17 @@ Resources:
         - AttributeName: id
           KeyType: HASH
       StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES
+        StreamViewType: NEW_IMAGE
       ProvisionedThroughput:
         ReadCapacityUnits: 2
         WriteCapacityUnits: 2
-  
-  # EventSourceDDBTableStream:
-  #   Type: AWS::Lambda::EventSourceMapping
-  #   Properties:
-  #     BatchSize: 1
-  #     Enabled: True
-  #     FilterCriteria:
-  #       Filters:
-  #         - Pattern: "{\"dynamodb\":{\"NewImage\":{\"quantity\":{\"numeric\":[\">\",\"0\"]},\"available\":{\"S\":[\"true\"]}}}}"
-  #     EventSourceArn: !GetAtt ShopifyStockTable.StreamArn
-  #     FunctionName: !GetAtt DiscordNotificationFunction.Arn
-  #     StartingPosition: TRIM_HORIZON
+
+  DiscordApiKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: 'This is the sensitive hash value that comes after "api/hooks/" in the Discord API key'
+      Name: DiscordApiKey
+      SecretString: '{"discord-api-key":"this-is-not-a-valid-key-please-replace"}'
 
 Outputs:
   WebEndpoint:
