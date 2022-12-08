@@ -1,22 +1,36 @@
-import { postToDiscord } from '../lib/discord.mjs';
-import { getAllItems } from '../lib/database.mjs';
+import { notifyDiscord } from '../lib/discord.mjs';
+import { ResponseBuilder } from '../lib/http.mjs';
+import { DynamoTable } from '../lib/database.mjs';
 
-// Get the Discord webook URL path
-const path = process.env.DISCORD_API_PATH;
-// const path = '/api/webhooks/1045794458228236348/Bl_b9FiHVno8orohzPQiyMhyniDHOzhiuxIkQUxkikadjUf8wBwbAjlv7CnYHkzpWvI5';
+// Get environment variables - set by CloudFormation/SAM
 
-// Get the DynamoDB table name from environment variables
-const tableName = process.env.KEEB_STOCK_TABLE;
+// Need the ARN of the DiscordApi secret in order to send Discord messages
+const secretArn = process.env.DISCORD_SECRET_ARN;
 
+// Need the table name of the DynamoDB instance which holds all product/stock data
+const inventoryTableName = process.env.INVENTORY_TABLE;
+const region = process.env.Region ? process.env.Region : 'us-east-1';
+
+// Initialize database connections
+const inventoryTable = new DynamoTable(region, inventoryTableName, 'id');
+
+/**
+ * Sends a Discord notification via webhook
+ * @param {*} event
+ * @param {*} context
+ * @returns
+ */
 export const discordNotificationHandler = async (event, context) => {
-  if ('httpMethod' in event && event.httpMethod !== 'POST') {
-    throw new Error(`postToDiscordHandler only accept POST method, you tried: ${event.httpMethod}`);
-  }
   // All log statements are written to CloudWatch
-  console.info('received:', event);
+  console.info('Received event:', JSON.stringify(event));
+
+  // Prepare the response
+  const responseBuilder = new ResponseBuilder()
+    .setBase64Encoded(false)
+    .setHeader('Content-Type', 'application/json');
 
   // get the content from the database
-  const items = await getAllItems(tableName);
+  const items = await inventoryTable.getAllItems();
 
   console.debug(`Received ${items?.length} objects from database`);
 
@@ -24,32 +38,31 @@ export const discordNotificationHandler = async (event, context) => {
   try {
     for (const item of items) {
       if (item.available) {
-        await postToDiscord(path, item);
+        await notifyDiscord(secretArn, item);
         console.debug('Discord notification succeeded');
       }
     }
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    // Return an HTTP 200 response
+    const res = responseBuilder
+      .setStatusCode(200)
+      .setBody({
         title: 'Shopify bot successfully notified the Discord server'
-      }),
-      isBase64Encoded: false
-    };
+      })
+      .build();
+
+    return res.toJSON();
   } catch (err) {
-    console.log(err);
+    // An error occurred while trying to send a message to Discord
+    console.error(err);
+    // Inform the source know that something went wrong
+    const res = responseBuilder
+      .setStatusCode(500)
+      .setBody({
+        title: 'Shopify bot failed to notify the Discord server.',
+        description: err.message ? err.message : 'An unknown error occurred. Please notify the admin.'
+      })
+      .build();
+    return res.toJSON();
   }
-  return {
-    statusCode: 200,
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      title: 'Shopify bot failed to notify the Discord server. Please inform the admin.'
-    }),
-    isBase64Encoded: false
-  };
 };

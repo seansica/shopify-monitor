@@ -1,15 +1,50 @@
 import { postRequest } from './http.mjs';
+import {
+  SecretsManagerClient,
+  GetSecretValueCommand
+} from '@aws-sdk/client-secrets-manager';
 
-export async function postToDiscord (path, messageContent) {
-  console.debug(`Executing discord::postToDiscord - path: '${path}' messageContent: '${JSON.stringify(messageContent)}'`);
+const client = new SecretsManagerClient({
+  region: process.env.Region ? process.env.Region : 'us-east-1'
+});
 
-  // will be used if messageContent is undefined
-  // const defaultBody = '{"content": "Posted Via Command line"}';
-  // const body = messageContent ? JSON.stringify({ content: messageContent }) : defaultBody;
+/**
+ * Send a Discord message via webhook
+ * For more info: https://discord.com/developers/docs/resources/webhook
+ * @param {*} secretArn
+ * @param {*} messageContent
+ * @returns
+ */
+export async function notifyDiscord (secretArn, messageContent) {
+  console.debug(`Executing discord::postToDiscord - messageContent: '${JSON.stringify(messageContent)}'`);
 
   if (!messageContent) {
     console.warn('No messageContent received. Skipping postToDiscord.');
     return;
+  }
+
+  // Fetch and parse the Discord API key from AWS Secrets Manager
+  let response;
+  // eslint-disable-next-line no-useless-catch
+  try {
+    console.debug('Attempting to retrieve Discord API key from vault...');
+    response = await client.send(
+      new GetSecretValueCommand({
+        SecretId: secretArn,
+        VersionStage: 'AWSCURRENT' // VersionStage defaults to AWSCURRENT if unspecified
+      })
+    );
+    console.debug('Key retrieval from vault success!');
+  } catch (error) {
+    console.error('Error', error);
+    console.error('An error occurred while trying to retrieve the Discord API key.');
+    throw error;
+  }
+
+  const discordApiKey = JSON.parse(response.SecretString)['discord-api-key'];
+
+  if (!discordApiKey) {
+    throw new Error('Discord API key not found.');
   }
 
   const body = {
@@ -19,7 +54,7 @@ export async function postToDiscord (path, messageContent) {
 
   const options = {
     hostname: 'discord.com',
-    path,
+    path: `/api/webhooks/${discordApiKey}`,
     method: 'POST',
     port: 443, // 👈️ replace with 80 for HTTP requests
     headers: {
@@ -31,39 +66,28 @@ export async function postToDiscord (path, messageContent) {
   try {
     const res = await postRequest(options, body);
     console.debug(`Discord response: ${JSON.stringify(res)}`);
-    return res;
   } catch (err) {
     console.error('Discord threw an error!');
     console.error('Error', err.message);
-    return err;
+    throw err;
   }
 }
 
+/**
+ * Can't decide which username to use... 🤡
+ * @returns
+ */
 function discordUsername () {
-  const seed = Math.floor(Math.random() * 10); // random integer from 0 to 9
-
-  // 0 to 2
-  if (seed >= 0 && seed < 3) {
-    return 'Keebot';
-  }
-  // 3 to 5
-  if (seed >= 3 && seed < 6) {
-    return 'Keebotron';
-  }
-  // 6 to 7
-  if (seed >= 6 && seed < 8) {
-    return 'Norbot';
-  }
-  // 8 to 9
-  if (seed >= 8 && seed < 10) {
-    return 'Thocotron';
-  }
+  return 'Keebatron';
 }
 
-function prettifyMessage (message) {
-  if ('title' in message &&
-      'quantity' in message &&
-      'site' in message) {
-    return `${message.title} - ${message.quantity ? message.quantity : 'unknown qty of'} units available!!! [Link](${message.site})`;
+/**
+ * Format the Discord message
+ * @param {*} message
+ * @returns
+ */
+function prettifyMessage ({ title, quantity, site }) {
+  if (title && quantity && site) {
+    return `${title} - ${quantity || 'unknown qty of'} units available!!! [Link](${site})`;
   }
 }
