@@ -27,6 +27,12 @@ export async function getRequest (getOptions) {
   });
 }
 
+/**
+ *
+ * @param {{ hostname, path, method, port, headers }} postOptions
+ * @param { string } body
+ * @returns {Promise<unknown>}
+ */
 export async function postRequest (postOptions, body) {
   console.debug(`Executing util::http::postRequest - postOptions: '${JSON.stringify(postOptions)} body: '${JSON.stringify(body)}'`);
   return new Promise((resolve, reject) => {
@@ -53,7 +59,8 @@ export async function postRequest (postOptions, body) {
     });
 
     // 👇️ write the body to the Request object
-    req.write(JSON.stringify(body));
+    // req.write(JSON.stringify(body));
+    req.write(body);
     req.end();
   });
 }
@@ -65,7 +72,7 @@ export class Response {
   constructor (statusCode, headers, body, isBase64Encoded) {
     this.statusCode = statusCode;
     this.headers = headers;
-    this.body = body;
+    this.body = JSON.stringify(body);
     this.isBase64Encoded = isBase64Encoded;
   }
 
@@ -77,7 +84,7 @@ export class Response {
     return {
       statusCode: this.statusCode,
       headers: this.headers,
-      body: JSON.stringify(this.body),
+      body: this.body,
       isBase64Encoded: this.isBase64Encoded
     };
   }
