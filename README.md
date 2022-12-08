@@ -2,7 +2,7 @@
 
 This project contains source code and supporting files for a serverless Shopify monitoring application that you can deploy with the AWS Serverless Application Model (AWS SAM) command line interface (CLI). 
 
-![](docs/shopify-bot.png)
+![](docs/shopify-bot-updates.png)
 
 It includes the following files and folders:
 
