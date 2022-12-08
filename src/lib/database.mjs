@@ -1,78 +1,75 @@
 import AWS from 'aws-sdk';
 
-// Set the region where the database is deployed
-AWS.config.update({ region: process.env.Region, apiVersion: '2012-08-10' });
-if (process.env.AWS_SAM_LOCAL) AWS.config.update({ dynamodb: { endpoint: process.env.DynamoDbEndpoint } });
+export class DynamoTable {
+  constructor (region, tableName, primaryKey) {
+    if (!tableName || !primaryKey) {
+      throw new Error('Cannot created Table without required parameters');
+    }
+    // Set the region where the database is deployed
+    AWS.config.update({ region, apiVersion: '2012-08-10' });
+    if (region === 'AWS_SAM_LOCAL') {
+      AWS.config.update({ dynamodb: { endpoint: process.env.DynamoDbEndpoint } });
+    }
 
-// Create connection outside of your functions to save
-// function process billing time (100 ms increments)
-const docClient = new AWS.DynamoDB.DocumentClient();
+    // Create connection outside your functions to save function process billing time (100 ms increments)
+    this.docClient = new AWS.DynamoDB.DocumentClient();
 
-/**
- * A simple function to write/put an object to a DynamoDB table
- * @param {*} tableName The name of the DynamoDB table
- * @param {*} item An object with properties: 'id', 'title', 'available', and 'quantity'
- * @returns
- */
-export async function writeContentToDatabase (tableName, item) {
-  console.debug(`Executing database::writeContentToDatabase - item '${JSON.stringify(item)}'`);
-
-  // do not process put request if required fields are not present
-  if (!('id' in item) ||
-        !('title' in item) ||
-        !('available' in item) ||
-        !('quantity' in item) ||
-        !('site' in item)
-  ) {
-    console.warn('Cannot put item because a property is missing');
-    return;
+    this.tableName = tableName;
+    this.primaryKey = primaryKey;
   }
 
-  const { id, title, available, quantity, site } = item;
+  async _scan (params) {
+    const scanResults = [];
+    let items;
+    do {
+      items = await this.docClient.scan(params).promise();
+      items.Items.forEach((item) => {
+        scanResults.push(item);
+      });
+      params.ExclusiveStartKey = items.LastEvaluatedKey;
+    }
+    while (typeof items.LastEvaluatedKey !== 'undefined');
 
-  const params = {
-    TableName: tableName,
-    Item: { id, title, available, quantity, site }
-  };
-
-  try {
-    await docClient.put(params).promise();
-  } catch (err) {
-    console.log('Error', err);
-    return err;
-  } finally {
-    console.debug(`Item ${item.id} has been added to the database`);
+    return scanResults;
   }
-}
 
-export async function getAllItems (tableName) {
-  console.debug('Executing database::getContentFromDatabase');
+  async putItem (item) {
+    console.debug(`Executing database::putItem - item '${JSON.stringify(item)}'`);
 
-  const params = {
-    TableName: tableName
-  };
+    if (!(Object.keys(item).indexOf(this.primaryKey) > -1)) {
+      // Primary key not in the object
+      throw new Error('Cannot put item. Primary key is missing');
+    }
 
-  const scanResults = [];
-  let items;
-  do {
-    items = await docClient.scan(params).promise();
-    items.Items.forEach((item) => {
-      scanResults.push(item);
-    });
-    params.ExclusiveStartKey = items.LastEvaluatedKey;
+    const params = {
+      TableName: this.tableName,
+      Item: { ...item }
+    };
+
+    try {
+      await this.docClient.put(params).promise();
+    } catch (err) {
+      console.log('Error', err);
+      return err;
+    } finally {
+      console.debug(`Item ${item.id} has been added to the database`);
+    }
   }
-  while (typeof items.LastEvaluatedKey !== 'undefined');
 
-  return scanResults;
+  async getAllItems () {
+    console.debug('Executing database::getAllItems');
+    const params = { TableName: this.tableName };
+    return await this._scan(params);
+  }
 
-  //   try {
-  //     const scanResults = [];
-  //     const data = await docClient.scan(params).promise();
-  //     data?.Items.forEach((item) => scanResults.push(item));
+  async getOneItem (itemKeyId) {
+    const params = {
+      TableName: this.tableName,
+      Key: {
+        KEY_NAME: { S: itemKeyId }
+      }
+    };
 
-//     console.debug(`Items received: '${JSON.stringify(scanResults)}'`);
-//     return scanResults;
-//   } catch (err) {
-//     console.error('Error', err);
-//   }
+    return await this._scan(params);
+  }
 }
