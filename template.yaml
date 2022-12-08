@@ -81,7 +81,7 @@ Resources:
   DiscordNotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/discord-handler.discordNotificationHandler
+      Handler: src/handlers/discord-handler.handler
       Runtime: nodejs18.x
       Architectures:
         - x86_64
