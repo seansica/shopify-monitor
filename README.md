@@ -134,8 +134,8 @@ Test a single function by invoking it directly with a test event. An event is a 
 Run functions locally and invoke them with the `sam local invoke` command.
 
 ```bash
-sudo sam local invoke "ShopifySynchronizationFunction" -e events/event-get-all-items.json
-sudo sam local invoke "postToDiscordFunction" -e events/event-post-item.json
+sudo sam local invoke "ShopifySyncFunction" -e events/event-get-all-items.json
+sudo sam local invoke "DiscordNotificationFunction" -e events/event-post-item.json
 ```
 
 The AWS SAM CLI can also emulate your application's API. Use the `sam local start-api` command to run the API locally on port 3000.
