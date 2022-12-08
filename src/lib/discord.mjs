@@ -47,10 +47,10 @@ export async function notifyDiscord (secretArn, messageContent) {
     throw new Error('Discord API key not found.');
   }
 
-  const body = {
+  const body = JSON.stringify({
     content: prettifyMessage(messageContent),
     username: discordUsername()
-  };
+  });
 
   const options = {
     hostname: 'discord.com',
@@ -59,7 +59,8 @@ export async function notifyDiscord (secretArn, messageContent) {
     port: 443, // 👈️ replace with 80 for HTTP requests
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Content-Length': body.length
     }
   };
 
