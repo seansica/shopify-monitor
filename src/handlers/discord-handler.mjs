@@ -113,7 +113,10 @@ async function notify (inventoryItems) {
     if (item.available && item.quantity > 0) {
       console.debug(`Item ${JSON.stringify(item)} is available. Notifying Discord.`);
       try {
-        await discord.sendMessage(item);
+        await discord.sendMessage({
+          eventType: EventTypes.Status_Update,
+          newImage: item
+        });
         console.debug('Discord notification sent.');
       } catch (err) {
         // An error occurred while trying to send a message to Discord

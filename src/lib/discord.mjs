@@ -13,7 +13,8 @@ export const EventTypes = {
   Not_Available_to_Available: 1,
   Quantity_Changed: 2,
   New_Inventory: 3,
-  False_Positive: 4
+  False_Positive: 4,
+  Status_Update: 5
 };
 
 /**
@@ -84,28 +85,39 @@ export class Discord {
       username: this.discordBotUsername
     };
 
-    const productName = analyzedEvent.newImage.title.S;
-    const newQuantity = analyzedEvent.newImage.quantity.N;
-    const hyperlink = analyzedEvent.newImage.site.S;
-
     // set the message based on the event type. this will result in a better user experience.
     // for example, if the product is no longer available, say "Product X is no longer available."
     // or if the product quantity simply changed, let the user know how much inventory is remaining
 
     switch (analyzedEvent.eventType) {
+      case EventTypes.Status_Update: {
+        const productName = analyzedEvent.newImage.title;
+        const productAvailability = analyzedEvent.newImage.available ? analyzedEvent.newImage.available : "unknown";
+        const productQuantity = analyzedEvent.newImage.quantity ? analyzedEvent.newImage.quantity : "unknown";
+        message.content = `Status Check: Product ${productName} | Available: ${productAvailability} | Quantity: ${productQuantity}`;
+        break;
+      }
       case EventTypes.Available_to_Not_Available: {
+        const productName = analyzedEvent.newImage.title.S;
+        const hyperlink = analyzedEvent.newImage.site.S;
         message.content = `Product ${productName} is no longer available...☹️ [LINK](${hyperlink})️`;
         break;
       }
       case EventTypes.Not_Available_to_Available: {
         // e.g., "Product X is available! 10 units available - BUY HERE"
+        const productName = analyzedEvent.newImage.title.S;
+        const newQuantity = analyzedEvent.newImage.quantity.N;
+        const hyperlink = analyzedEvent.newImage.site.S;
         message.content = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [BUY HERE](${hyperlink})`;
         break;
       }
       case EventTypes.Quantity_Changed: {
+        const productName = analyzedEvent.newImage.title.S;
+        const newQuantity = analyzedEvent.newImage.quantity.N;
         const oldQuantity = analyzedEvent.oldImage.quantity.N;
+        const hyperlink = analyzedEvent.newImage.site.S;
         if (newQuantity && oldQuantity) {
-          message.content = `Product quantity changed from ${oldQuantity} to ${newQuantity} - [BUY HERE](${hyperlink})`;
+          message.content = `Product ${productName} quantity changed from ${oldQuantity} to ${newQuantity} - [BUY HERE](${hyperlink})`;
         } else {
           message.content = `Product quantity changed - [BUY HERE](${hyperlink})`;
         }
