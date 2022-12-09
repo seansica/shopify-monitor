@@ -34,7 +34,7 @@ export async function getRequest (getOptions) {
  * @returns {Promise<unknown>}
  */
 export async function postRequest (postOptions, body) {
-  console.debug(`Executing util::http::postRequest - postOptions: '${JSON.stringify(postOptions)} body: '${JSON.stringify(body)}'`);
+  console.debug(`Executing util::http::postRequest - postOptions: '${JSON.stringify(postOptions)} body: '${body}'`);
   return new Promise((resolve, reject) => {
     const req = https.request(postOptions, res => {
       let rawData = '';

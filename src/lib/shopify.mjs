@@ -55,22 +55,28 @@ export function processShopifyResponse (bodyJSON, site) {
   // Iterate over all products available at the site. For each one, generate a summary object and push it onto the items list.
   for (let i = 0; i <= bodyJSON.variants.length; i++) {
     // Parse each stock item
-    const stockItem = bodyJSON.variants[i];
+    const inventoryItem = bodyJSON.variants[i];
 
-    if (stockItem?.title) {
+    if (inventoryItem?.title) {
+      // Sometimes merchants do not use 'title', in which case the title defaults to 'Default Title'.
+      // This is a useless value, so we can fallback to 'name' if that occurs.
+      const itemName = inventoryItem.title === 'Default Title' ? inventoryItem?.name : inventoryItem.title;
+
       // Log the availability status of each stock item
-      if (stockItem?.available) {
-        console.info(`IN STOCK (${stockItem?.inventory_quantity})!!! --> ${stockItem.title}`);
-      } else {
-        console.info(`NOT IN STOCK --> ${stockItem.title}`);
+      {
+        if (inventoryItem?.available) {
+          console.info(`IN STOCK (${inventoryItem?.inventory_quantity})!!! --> ${itemName}`);
+        } else {
+          console.info(`NOT IN STOCK --> ${itemName}`);
+        }
       }
 
       // Push a summary object for each stock item
       items.push({
-        id: String(stockItem?.id),
-        title: stockItem?.title,
-        available: stockItem?.available,
-        quantity: stockItem?.inventory_quantity,
+        id: String(inventoryItem?.id),
+        title: itemName,
+        available: inventoryItem?.available,
+        quantity: inventoryItem?.inventory_quantity,
         site: hyperlink
       });
     }

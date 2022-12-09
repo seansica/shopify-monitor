@@ -1,4 +1,4 @@
-import { postRequest } from './http-helper.mjs';
+import { postRequest } from './http.mjs';
 import {
   SecretsManagerClient,
   GetSecretValueCommand
@@ -8,38 +8,36 @@ const client = new SecretsManagerClient({
   region: process.env.Region ? process.env.Region : 'us-east-1'
 });
 
+export const EventTypes = {
+  Available_to_Not_Available: 0,
+  Not_Available_to_Available: 1,
+  Quantity_Changed: 2,
+  New_Inventory: 3,
+  False_Positive: 4
+};
+
 /**
  * Discord helper class to send messages via webhook
  */
 export class Discord {
-
   /**
    * Initializes a class instance
    * @param {*} secretArn The ARN of the Secrets Manager vault in which the Discord API key is stored
    * @param {*} discordBotUsername An optional username for the Discord bot (will be seen in posted messages on Discord)
    */
-  constructor(secretArn, discordBotUsername) {
+  constructor (secretArn, discordBotUsername) {
     this.secretArn = secretArn;
-    this.discordBotUsername = discordBotUsername ? discordBotUsername : "Keebatron";
+    this.discordBotUsername = discordBotUsername || 'Keebatron';
   }
 
-  async sendMessage() {
-    console.debug(`Executing Discord::sendMessage - messageContent: '${JSON.stringify(messageContent)}'`);
-
-    // stop if no mesage content to send
-    if (!messageContent) {
-      console.warn('No messageContent received. Skipping postToDiscord.');
-      return;
-    }
-
-    // Fetch and parse the Discord API key from AWS Secrets Manager
+  async _getApiKey () {
     let secretsManagerResponse;
     // eslint-disable-next-line no-useless-catch
     try {
       console.debug('Attempting to retrieve Discord API key from vault...');
       secretsManagerResponse = await client.send(
         new GetSecretValueCommand({
-          SecretId: secretArn,
+          SecretId: this.secretArn,
           VersionStage: 'AWSCURRENT' // VersionStage defaults to AWSCURRENT if unspecified
         })
       );
@@ -56,13 +54,75 @@ export class Discord {
       throw new Error('Discord API key not found.');
     }
 
-    // compose the body for the HTTP post request
-    const body = JSON.stringify({
-      content: this._prettifyMessage(messageContent),
-      username: discordUsername()
-    });
+    return discordApiKey;
+  }
 
-    // compose the options for the HTTP post request
+  /**
+   * Send a Discord message via webhook
+   * @param analyzedEvent
+   * @param {EventTypes} analyzedEvent.eventType
+   * @param {*} analyzedEvent.newImage
+   * @param {*} [analyzedEvent.oldImage]
+   * @returns {Promise<void>}
+   */
+  async sendMessage (analyzedEvent) {
+    console.debug(`Executing Discord::sendMessage - newAndOldImages: '${JSON.stringify(analyzedEvent)}'`);
+
+    // stop if no message content to send
+    if (!analyzedEvent) {
+      console.warn('analyzedEvent is undefined');
+      throw new Error('No message content received. Exiting.');
+    }
+
+    // Fetch and parse the Discord API key from AWS Secrets Manager
+    const discordApiKey = await this._getApiKey();
+
+    // compose the body for the HTTP post request
+
+    const message = {
+      // content:  👈 this will be set in the following switch statement
+      username: this.discordBotUsername
+    };
+
+    const productName = analyzedEvent.newImage.title.S;
+    const newQuantity = analyzedEvent.newImage.quantity.N;
+    const hyperlink = analyzedEvent.newImage.site.S;
+
+    // set the message based on the event type. this will result in a better user experience.
+    // for example, if the product is no longer available, say "Product X is no longer available."
+    // or if the product quantity simply changed, let the user know how much inventory is remaining
+
+    switch (analyzedEvent.eventType) {
+      case EventTypes.Available_to_Not_Available: {
+        message.content = `Product ${productName} is no longer available...☹️ [LINK](${hyperlink})️`;
+        break;
+      }
+      case EventTypes.Not_Available_to_Available: {
+        // e.g., "Product X is available! 10 units available - BUY HERE"
+        message.content = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [BUY HERE](${hyperlink})`;
+        break;
+      }
+      case EventTypes.Quantity_Changed: {
+        const oldQuantity = analyzedEvent.oldImage.quantity.N;
+        if (newQuantity && oldQuantity) {
+          message.content = `Product quantity changed from ${oldQuantity} to ${newQuantity} - [BUY HERE](${hyperlink})`;
+        } else {
+          message.content = `Product quantity changed - [BUY HERE](${hyperlink})`;
+        }
+        break;
+      }
+      case EventTypes.New_Inventory: {
+        message.content = `New product posted 🚨 ${productName} (Qty ${newQuantity}) - [LINK](${hyperlink})`;
+        break;
+      }
+      default:
+        throw new Error('An unhandled stream event occurred.');
+    }
+
+    // the body must be stringified before sending the HTTP request
+    const body = JSON.stringify(message);
+
+    // compose the HTTP post options
     const options = {
       hostname: 'discord.com',
       path: `/api/webhooks/${discordApiKey}`,
@@ -75,6 +135,7 @@ export class Discord {
       }
     };
 
+    // send the message!
     try {
       const res = await postRequest(options, body);
       console.debug(`Discord response: ${JSON.stringify(res)}`);
@@ -84,13 +145,7 @@ export class Discord {
       throw err;
     }
   }
-
-  _prettifyMessage({ title, quantity, site }) {
-    if (title && quantity && site) {
-      return `${title} - ${quantity || 'unknown qty of'} units available!!! [Link](${site})`;
-    }
-  }
-
+}
 
 /**
  * Send a Discord message via webhook
