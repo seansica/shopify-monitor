@@ -139,7 +139,7 @@ Resources:
         - AttributeName: name
           KeyType: HASH
       StreamSpecification:
-        StreamViewType: NEW_IMAGE
+        StreamViewType: NEW_AND_OLD_IMAGES
       ProvisionedThroughput:
         ReadCapacityUnits: 2
         WriteCapacityUnits: 2
@@ -154,7 +154,7 @@ Resources:
         - AttributeName: id
           KeyType: HASH
       StreamSpecification:
-        StreamViewType: NEW_IMAGE
+        StreamViewType: NEW_AND_OLD_IMAGES
       ProvisionedThroughput:
         ReadCapacityUnits: 2
         WriteCapacityUnits: 2
