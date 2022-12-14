@@ -16,7 +16,7 @@ Resources:
   ConfigFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/config-handler.configHandler
+      Handler: build/handlers/config.handler
       Runtime: nodejs18.x
       Architectures:
         - x86_64
@@ -37,11 +37,10 @@ Resources:
             Path: /config
             Method: POST
 
-  # This is a Lambda function config associated with the source code: get-all-items.js
   ShopifySyncFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/shopify-handler.shopifySyncHandler
+      Handler: build/handlers/shopify-sync.handler
       Runtime: nodejs18.x
       Architectures:
         - x86_64
@@ -77,27 +76,62 @@ Resources:
                 MaximumEventAgeInSeconds: 86400
                 MaximumRetryAttempts: 185
 
-  # This is a Lambda function config associated with the source code: discord-handler.js
-  DiscordNotificationFunction:
+  DiscordSnsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handlers/discord-handler.handler
+      Handler: build/handler/discord-sns.handler
       Runtime: nodejs18.x
       Architectures:
         - x86_64
-      MemorySize: 256 # 128
+      MemorySize: 128
+      Timeout: 100
+      Description: |2
+        Receives DynamoDB event streams from the InventoryTable and decides whether a Discord message should be sent. If
+        so, then craft notify the SNS Topic. DiscordNotificationFunction subscribes and sends messages from the queue.
+      Events:
+        StreamEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt InventoryTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
+            Enabled: true
+
+  DiscordSNSTopic:
+    # The DiscordSns Lambda function sends messages to the topic.
+    # The DiscordNotification Lambda function subscribes to this topic.
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: "Discord Message Queue"
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+              - 'DiscordNotificationFunction'
+              - 'Arn'
+          Protocol: "lambda"
+      TopicName: "DiscordSNSTopic"
+
+  DiscordNotificationFunction:
+    # This Lambda function sends Discord messages via HTTP webhook
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: build/handlers/discord-notification.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256 # TODO test if 128 can be used instead
       Timeout: 100
       Description: Sends a Discord notification when a product is available
       Policies:
-          # Give Create/Read/Update/Delete Permissions to the InventoryTable
         - DynamoDBCrudPolicy:
+            # Grants Create/Read/Update/Delete Permissions on the table
             TableName: !Ref InventoryTable
-          # Enable Function to perform DescribeStream, GetRecords, GetShardIterator, ListStreams actions on the table
         - DynamoDBStreamReadPolicy:
+            # Grants the DescribeStream, GetRecords, GetShardIterator, ListStreams actions on the table
             TableName: !Ref InventoryTable
             StreamName: !GetAtt InventoryTable.StreamArn
-          # Enable Function to read Secret Manager store to retrieve Discord API key
         - AWSSecretsManagerGetSecretValuePolicy:
+            # Grants read access to Secrets Manager; used to retrieve Discord API key
             SecretArn: !Ref DiscordApiKey
       Environment:
         Variables:
@@ -110,14 +144,32 @@ Resources:
           Properties:
             Path: /
             Method: POST
-        StreamEvent:
-          Type: DynamoDB
+        SNSEvent:
+          Type: SNS
           Properties:
-            Stream: !GetAtt InventoryTable.StreamArn
-            StartingPosition: TRIM_HORIZON
-            BatchSize: 1
-            Enabled: true
-        # Uncomment the Schedule event if you would prefer to automatically run the DiscordNotificationFunction on a regular schedule
+            Topic:
+              Ref: DiscordSNSTopic
+#            SqsSubscription: true
+#            FilterPolicy:
+#              store:
+#                - example_corp
+#              price_usd:
+#                - numeric:
+#                    - ">="
+#                    - 100
+
+        # TODO delete the following StreamEvent after implementing the new SNS workflow
+        #StreamEvent:
+        #  Type: DynamoDB
+        #  Properties:
+        #    Stream: !GetAtt InventoryTable.StreamArn
+        #    StartingPosition: TRIM_HORIZON
+        #    BatchSize: 1
+        #    Enabled: true
+
+        # Uncomment the following Schedule event if you would prefer to automatically run the
+        # DiscordNotificationFunction on a regular schedule:
+
         # Schedule:
         #   Type: Schedule
         #   Properties:

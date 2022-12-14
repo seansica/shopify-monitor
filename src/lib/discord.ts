@@ -1,4 +1,4 @@
-import { postRequest } from './http.mjs';
+import { postRequest } from './http';
 import {
   SecretsManagerClient,
   GetSecretValueCommand
@@ -21,17 +21,21 @@ export const EventTypes = {
  * Discord helper class to send messages via webhook
  */
 export class Discord {
+
+  private readonly secretArn: string;
+  private readonly discordBotUsername: string;
+
   /**
    * Initializes a class instance
    * @param {*} secretArn The ARN of the Secrets Manager vault in which the Discord API key is stored
    * @param {*} discordBotUsername An optional username for the Discord bot (will be seen in posted messages on Discord)
    */
-  constructor (secretArn, discordBotUsername) {
+  constructor (secretArn: string, discordBotUsername: string) {
     this.secretArn = secretArn;
     this.discordBotUsername = discordBotUsername || 'Keebatron';
   }
 
-  async _getApiKey () {
+  async _getApiKey (): Promise<unknown> {
     let secretsManagerResponse;
     // eslint-disable-next-line no-useless-catch
     try {
@@ -48,7 +52,11 @@ export class Discord {
       console.error('An error occurred while trying to retrieve the Discord API key.');
       throw error;
     }
+
     // Parse the discord api key
+
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     const discordApiKey = JSON.parse(secretsManagerResponse.SecretString)['discord-api-key'];
 
     if (!discordApiKey) {
@@ -80,8 +88,13 @@ export class Discord {
 
     // compose the body for the HTTP post request
 
-    const message = {
-      // content:  👈 this will be set in the following switch statement
+    interface DiscordMessage {
+      username: string;
+      content: string;
+    }
+
+    const message: DiscordMessage = {
+      content: "", // 👈 this will be set in the following switch statement
       username: this.discordBotUsername
     };
 
@@ -92,9 +105,10 @@ export class Discord {
     switch (analyzedEvent.eventType) {
       case EventTypes.Status_Update: {
         const productName = analyzedEvent.newImage.title;
-        const productAvailability = analyzedEvent.newImage.available ? analyzedEvent.newImage.available : "unknown";
-        const productQuantity = analyzedEvent.newImage.quantity ? analyzedEvent.newImage.quantity : "unknown";
-        message.content = `Status Check: Product ${productName} | Available: ${productAvailability} | Quantity: ${productQuantity}`;
+        const productAvailability = analyzedEvent.newImage.available ? analyzedEvent.newImage.available : 'unknown';
+        const productQuantity = analyzedEvent.newImage.quantity ? analyzedEvent.newImage.quantity : 'unknown';
+        const hyperlink = analyzedEvent.newImage.site;
+        message.content = `Status Check: PRODUCT ${productName} | AVAILABLE: ${productAvailability} | QUANTITY: ${productQuantity} | [Link](${hyperlink})`;
         break;
       }
       case EventTypes.Available_to_Not_Available: {
@@ -151,95 +165,13 @@ export class Discord {
     try {
       const res = await postRequest(options, body);
       console.debug(`Discord response: ${JSON.stringify(res)}`);
-    } catch (err) {
+
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+    } catch (err: Error) {
       console.error('Discord threw an error!');
       console.error('Error', err.message);
       throw err;
     }
   }
 }
-
-/**
- * Send a Discord message via webhook
- * For more info: https://discord.com/developers/docs/resources/webhook
- * @param {*} secretArn
- * @param {*} messageContent
- * @returns
- */
-// export async function notifyDiscord (secretArn, messageContent) {
-//   console.debug(`Executing discord::postToDiscord - messageContent: '${JSON.stringify(messageContent)}'`);
-
-//   if (!messageContent) {
-//     console.warn('No messageContent received. Skipping postToDiscord.');
-//     return;
-//   }
-
-//   // Fetch and parse the Discord API key from AWS Secrets Manager
-//   let response;
-//   // eslint-disable-next-line no-useless-catch
-//   try {
-//     console.debug('Attempting to retrieve Discord API key from vault...');
-//     response = await client.send(
-//       new GetSecretValueCommand({
-//         SecretId: secretArn,
-//         VersionStage: 'AWSCURRENT' // VersionStage defaults to AWSCURRENT if unspecified
-//       })
-//     );
-//     console.debug('Key retrieval from vault success!');
-//   } catch (error) {
-//     console.error('Error', error);
-//     console.error('An error occurred while trying to retrieve the Discord API key.');
-//     throw error;
-//   }
-
-//   const discordApiKey = JSON.parse(response.SecretString)['discord-api-key'];
-
-//   if (!discordApiKey) {
-//     throw new Error('Discord API key not found.');
-//   }
-
-//   const body = JSON.stringify({
-//     content: prettifyMessage(messageContent),
-//     username: discordUsername()
-//   });
-
-//   const options = {
-//     hostname: 'discord.com',
-//     path: `/api/webhooks/${discordApiKey}`,
-//     method: 'POST',
-//     port: 443, // 👈️ replace with 80 for HTTP requests
-//     headers: {
-//       Accept: 'application/json',
-//       'Content-Type': 'application/json',
-//       'Content-Length': body.length
-//     }
-//   };
-
-//   try {
-//     const res = await postRequest(options, body);
-//     console.debug(`Discord response: ${JSON.stringify(res)}`);
-//   } catch (err) {
-//     console.error('Discord threw an error!');
-//     console.error('Error', err.message);
-//     throw err;
-//   }
-// }
-
-// /**
-//  * Can't decide which username to use... 🤡
-//  * @returns
-//  */
-// function discordUsername () {
-//   return 'Keebatron';
-// }
-
-// /**
-//  * Format the Discord message
-//  * @param {*} message
-//  * @returns
-//  */
-// function prettifyMessage ({ title, quantity, site }) {
-//   if (title && quantity && site) {
-//     return `${title} - ${quantity || 'unknown qty of'} units available!!! [Link](${site})`;
-//   }
-// }

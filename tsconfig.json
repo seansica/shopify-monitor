@@ -5,7 +5,7 @@
     "allowJs": true,
     "strict": true,
     "preserveConstEnums": true,
-    "noEmit": true,
+    "noEmit": false,
     "sourceMap": false,
     "module":"es6",
     "moduleResolution":"node",
@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "useUnknownInCatchVariables": true
   },
   "include": ["./src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "**/*.test.mjs"]

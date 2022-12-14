@@ -1,6 +1,7 @@
-import { Discord, EventTypes } from '../lib/discord.mjs';
-// import { ResponseBuilder } from '../lib/http.mjs';
+import { Discord, EventTypes } from '../lib/discord.ts';
+import { ResponseSuccess, ResponseError } from '../lib/http.mjs';
 import { DynamoTable } from '../lib/database.mjs';
+import { APIGatewayProxyCallback, Context, SNSEvent } from "aws-lambda";
 
 // Get environment variables - set by CloudFormation/SAM
 
@@ -21,19 +22,7 @@ const inventoryTable = new DynamoTable(region, inventoryTableName, 'id');
 // const rb = new ResponseBuilder()
 //   .setBase64Encoded(false)
 //   .setHeader('Content-Type', 'application/json');
-const response_success = {
-  statusCode: 200,
-  body: JSON.stringify({
-    message: 'ok'
-  })
-};
 
-const response_error = {
-  statusCode: 400,
-  body: JSON.stringify({
-    message: 'error'
-  })
-};
 
 /**
  * Sends a Discord notification via webhook
@@ -42,16 +31,16 @@ const response_error = {
  * @param {*} callback
  * @returns
  */
-export const handler = async (event, context, callback) => {
+export const handler = async (event: SNSEvent, context: Context, callback: APIGatewayProxyCallback) => {
   // All log statements are written to CloudWatch
   console.info('Received event:', JSON.stringify(event));
 
   if (event.httpMethod && event.httpMethod === 'POST' && event.path === '/') {
     try {
       await checkAllItemsAndNotify();
-      callback(undefined, response_success); // TODO <-- fill in the context with a res object
+      callback(undefined, ResponseSuccess);
     } catch (err) {
-      callback(response_error); // TODO <-- fill in the context with a res object
+      callback(ResponseError);
     }
   } else if (event.Records) {
     for (const record of event.Records) {
@@ -70,7 +59,7 @@ export const handler = async (event, context, callback) => {
 
       if (analyzedEvent.eventType === EventTypes.False_Positive) {
         console.warn('Skipping item because it already exists and no changes were detected.');
-        callback(undefined, response_success);
+        callback(undefined, ResponseSuccess);
         continue; // skip to next loop iteration
       }
 
@@ -87,7 +76,7 @@ export const handler = async (event, context, callback) => {
     // end forEach
     }
   }
-  callback(undefined, response_success); // TODO <-- fill in the context with a res object
+  callback(undefined, ResponseSuccess); // TODO <-- fill in the context with a res object
 };
 
 async function checkAllItemsAndNotify () {
