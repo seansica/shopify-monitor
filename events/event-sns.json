@@ -1,0 +1,57 @@
+{
+  "Records": [
+    {
+      "eventID": "ee9e82a293f0497fb16f8a66435ab13d",
+      "eventName": "MODIFY",
+      "eventVersion": "1.1",
+      "eventSource": "aws:dynamodb",
+      "awsRegion": "us-east-1",
+      "dynamodb": {
+        "ApproximateCreationDateTime": 1671408543,
+        "Keys": {
+          "id": {
+            "S": "39788152946742"
+          }
+        },
+        "NewImage": {
+          "site": {
+            "S": "https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition"
+          },
+          "quantity": {
+            "N": "0"
+          },
+          "available": {
+            "BOOL": false
+          },
+          "id": {
+            "S": "39788152946742"
+          },
+          "title": {
+            "S": "White ABS Switch Plate"
+          }
+        },
+        "OldImage": {
+          "site": {
+            "S": "https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition"
+          },
+          "quantity": {
+            "N": "5"
+          },
+          "available": {
+            "BOOL": true
+          },
+          "id": {
+            "S": "39788152946742"
+          },
+          "title": {
+            "S": "White ABS Switch Plate"
+          }
+        },
+        "SequenceNumber": "46631400000000024891021619",
+        "SizeBytes": 317,
+        "StreamViewType": "NEW_AND_OLD_IMAGES"
+      },
+      "eventSourceARN": "arn:aws:dynamodb:us-east-1:328571739532:table/shopify-bot-InventoryTable-63TBY3OGM1M0/stream/2022-12-09T01:52:28.089"
+    }
+  ]
+}

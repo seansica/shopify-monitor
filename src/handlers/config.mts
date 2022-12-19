@@ -1,14 +1,11 @@
 import { Context, APIGatewayProxyCallback, APIGatewayEvent } from 'aws-lambda';
-import { DynamoTable } from '../lib/database.mjs';
-import { ResponseError, ResponseSuccess } from "../lib/http";
+import { putItem } from '../lib/database/ddbdoc-put-item.mjs';
+import { ResponseError, ResponseSuccess } from "../lib/http.mjs";
 
 // Get environment variables - set by CloudFormation/SAM
 
 const configTableName = process.env.CONFIG_TABLE;
-const region = process.env.Region ? process.env.Region : 'us-east-1';
-
-// Initialize database connections
-const configTable = new DynamoTable(region, configTableName, 'name');
+if (!configTableName) throw new Error('CONFIG_TABLE is undefined.');
 
 /**
  * Perform various config actions on the Config Table
@@ -51,7 +48,7 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
           type: 'SITE'
         };
         console.debug(`Writing site item ${JSON.stringify(siteItem)} to ConfigTable`);
-        await configTable.putItem(siteItem);
+        await putItem(configTableName, siteItem);
       }
 
       // Return a 200 response

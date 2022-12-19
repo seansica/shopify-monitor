@@ -1,6 +1,6 @@
 import https from 'https';
 import { RequestOptions } from "http";
-import * as HttpCodes from 'http-codes';
+import { StatusCodes } from 'http-status-codes';
 
 export async function getRequest (options: RequestOptions) {
   console.debug(`Executing util::http::getRequest - getOptions '${JSON.stringify(options)}`);
@@ -79,14 +79,14 @@ class Response extends Error {
   constructor (statusCode: number, body?: string) {
     super();
     this.body = body? body : this.body;
-    this.statusCode = (statusCode && statusCode in HttpCodes) ? statusCode : this.statusCode;
+    this.statusCode = (statusCode && statusCode in StatusCodes) ? statusCode : this.statusCode;
   }
 }
 
 export class ResponseSuccess extends Response {
   constructor(body?: string, statusCode?: number) {
     super(
-        statusCode ? statusCode : HttpCodes.ACCEPTED,
+        statusCode ? statusCode : StatusCodes.ACCEPTED,
         body ? body : 'ok'
     );
   }
@@ -95,7 +95,7 @@ export class ResponseSuccess extends Response {
 export class ResponseError extends Response {
   constructor(body?: string, statusCode?: number) {
     super(
-        statusCode ? statusCode : HttpCodes.BAD_REQUEST,
+        statusCode ? statusCode : StatusCodes.BAD_REQUEST,
         body ? body : 'error'
     );
   }

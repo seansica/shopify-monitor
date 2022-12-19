@@ -32,6 +32,9 @@ aws secretsmanager put-secret-value \
 curl -X POST https://your-slug.execute-api.us-east-1.amazonaws.com/Prod/config\
   ?site=https://shopifySite1.com \
   &site=https://shopifySite2.com \
+  
+#compile the typescript
+tsc && renamer --find js --replace mjs './dist/**/*.js'
 ```
 
 ---

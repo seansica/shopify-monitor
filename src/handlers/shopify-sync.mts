@@ -1,19 +1,23 @@
-import { sendShopifyRequest, processShopifyResponse } from '../lib/shopify';
-import { DynamoTable } from '../lib/database.mjs';
-import { ResponseError, ResponseSuccess } from '../lib/http';
+import { sendShopifyRequest, processShopifyResponse } from '../lib/shopify.mjs';
+import { scanItems } from '../lib/database/ddbdoc-scan-items.mjs';
+import { putItem } from '../lib/database/ddbdoc-put-item.mjs';
+import { ResponseError, ResponseSuccess } from '../lib/http.mjs';
 import { APIGatewayEvent, APIGatewayProxyCallback, Context } from 'aws-lambda';
-import { InventoryItem } from "../types/inventory-event";
-import { ShopifyResponse } from "../types/shopify-response";
+import { InventoryItem } from "../types/inventory-event.mjs";
+import { ShopifyResponse } from "../types/shopify-response.mjs";
 
 // Get environment variables - set by CloudFormation/SAM
 
 const inventoryTableName = process.env.INVENTORY_TABLE;
 const configTableName = process.env.CONFIG_TABLE;
-const region = process.env.Region ? process.env.Region : 'us-east-1';
+// const REGION = process.env.Region ? process.env.Region : 'us-east-1';
+
+if (!inventoryTableName) throw new Error('INVENTORY_TABLE must be defined.')
+if (!configTableName) throw new Error('CONFIG_TABLE must be defined.');
 
 // Initialize database connections
-const configTable = new DynamoTable(region, configTableName, 'name');
-const inventoryTable = new DynamoTable(region, inventoryTableName, 'id');
+// const configTable = new DynamoTable(region, configTableName, 'name');
+// const inventoryTable = new DynamoTable(region, inventoryTableName, 'id');
 
 /**
  * A simple example includes an HTTP get method to get all items from a DynamoDB table.
@@ -35,7 +39,9 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   //   .setBase64Encoded(false);
 
   // Retrieve the list of Shopify site URLs to check from the ConfigTable
-  const configItems = await configTable.getAllItems();
+  // const configItems = await configTable.getAllItems();
+  const configItems = await scanItems(configTableName)
+  if (!configItems) throw new Error('No items returned from scan.');
   const sites = [];
   for (const item of configItems) {
     if (item.type === 'SITE') {
@@ -72,29 +78,15 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
          *      site: str
          * }
          */
-        await inventoryTable.putItem(item);
+        await putItem(inventoryTableName, item);
       }
     }
 
-    // Return a 200 HTTP response
-    // const res = responseBuilder
-    //   .setStatusCode(200)
-    //   .setBody(allItems)
-    //   .build();
-    // return res.toJSON();
     callback(undefined, new ResponseSuccess())
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
   } catch (err: Error) {
     console.error(err.message);
-    // const res = responseBuilder
-    //   .setStatusCode(500)
-    //   .setBody({
-    //     title: 'Failed to handle Shopify content',
-    //     error: err.message
-    //   })
-    //   .build();
-    // return res.toJSON();
     // Failed to handle Shopify content
     callback(new ResponseError())
   }

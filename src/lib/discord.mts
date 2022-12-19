@@ -1,4 +1,4 @@
-import { postRequest } from './http';
+import { postRequest } from './http.mjs';
 import {
   SecretsManagerClient,
   GetSecretValueCommand
@@ -16,6 +16,11 @@ export const EventTypes = {
   False_Positive: 4,
   Status_Update: 5
 };
+
+interface DiscordMessage {
+  username: string;
+  content: string;
+}
 
 /**
  * Discord helper class to send messages via webhook
@@ -66,19 +71,11 @@ export class Discord {
     return discordApiKey;
   }
 
-  /**
-   * Send a Discord message via webhook
-   * @param analyzedEvent
-   * @param {EventTypes} analyzedEvent.eventType
-   * @param {*} analyzedEvent.newImage
-   * @param {*} [analyzedEvent.oldImage]
-   * @returns {Promise<void>}
-   */
-  async sendMessage (analyzedEvent) {
-    console.debug(`Executing Discord::sendMessage - newAndOldImages: '${JSON.stringify(analyzedEvent)}'`);
+  async sendMessage (discordMessage: string) {
+    console.debug(`Executing Discord::sendMessage - '${discordMessage}'`);
 
     // stop if no message content to send
-    if (!analyzedEvent) {
+    if (!discordMessage) {
       console.warn('analyzedEvent is undefined');
       throw new Error('No message content received. Exiting.');
     }
@@ -88,62 +85,10 @@ export class Discord {
 
     // compose the body for the HTTP post request
 
-    interface DiscordMessage {
-      username: string;
-      content: string;
-    }
-
     const message: DiscordMessage = {
-      content: "", // 👈 this will be set in the following switch statement
+      content: discordMessage,
       username: this.discordBotUsername
     };
-
-    // set the message based on the event type. this will result in a better user experience.
-    // for example, if the product is no longer available, say "Product X is no longer available."
-    // or if the product quantity simply changed, let the user know how much inventory is remaining
-
-    switch (analyzedEvent.eventType) {
-      case EventTypes.Status_Update: {
-        const productName = analyzedEvent.newImage.title;
-        const productAvailability = analyzedEvent.newImage.available ? analyzedEvent.newImage.available : 'unknown';
-        const productQuantity = analyzedEvent.newImage.quantity ? analyzedEvent.newImage.quantity : 'unknown';
-        const hyperlink = analyzedEvent.newImage.site;
-        message.content = `Status Check: PRODUCT ${productName} | AVAILABLE: ${productAvailability} | QUANTITY: ${productQuantity} | [Link](${hyperlink})`;
-        break;
-      }
-      case EventTypes.Available_to_Not_Available: {
-        const productName = analyzedEvent.newImage.title.S;
-        const hyperlink = analyzedEvent.newImage.site.S;
-        message.content = `Product ${productName} is no longer available...☹️ [LINK](${hyperlink})️`;
-        break;
-      }
-      case EventTypes.Not_Available_to_Available: {
-        // e.g., "Product X is available! 10 units available - BUY HERE"
-        const productName = analyzedEvent.newImage.title.S;
-        const newQuantity = analyzedEvent.newImage.quantity.N;
-        const hyperlink = analyzedEvent.newImage.site.S;
-        message.content = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [BUY HERE](${hyperlink})`;
-        break;
-      }
-      case EventTypes.Quantity_Changed: {
-        const productName = analyzedEvent.newImage.title.S;
-        const newQuantity = analyzedEvent.newImage.quantity.N;
-        const oldQuantity = analyzedEvent.oldImage.quantity.N;
-        const hyperlink = analyzedEvent.newImage.site.S;
-        if (newQuantity && oldQuantity) {
-          message.content = `Product ${productName} quantity changed from ${oldQuantity} to ${newQuantity} - [BUY HERE](${hyperlink})`;
-        } else {
-          message.content = `Product quantity changed - [BUY HERE](${hyperlink})`;
-        }
-        break;
-      }
-      case EventTypes.New_Inventory: {
-        message.content = `New product posted 🚨 ${productName} (Qty ${newQuantity}) - [LINK](${hyperlink})`;
-        break;
-      }
-      default:
-        throw new Error('An unhandled stream event occurred.');
-    }
 
     // the body must be stringified before sending the HTTP request
     const body = JSON.stringify(message);

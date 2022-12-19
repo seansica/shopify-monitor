@@ -1,7 +1,7 @@
-import { getRequest } from './http';
+import { getRequest } from './http.mjs';
 import { RequestOptions } from "http";
-import { ShopifyResponse, ShopifyProduct } from "../types/shopify-response";
-import { InventoryItem } from "../types/inventory-event";
+import { ShopifyResponse, ShopifyProduct } from '../types/shopify-response.mjs';
+import { InventoryItem } from "../types/inventory-event.mjs";
 const fileExtensionMatchPattern = /\.[^/.]+$/; // RegEx to match file extensions like '.jpeg', '.js', '.html', etc.
 
 
@@ -29,7 +29,8 @@ export async function sendShopifyRequest (hostname: string, pathname: string) {
 
   try {
     // Send a request to the Shopify site
-    const response = <ShopifyResponse>(await getRequest(options));
+    // @ts-ignore
+    const response = <ShopifyResponse>await getRequest(options);
     console.debug(`Shopify Response is '${JSON.stringify(response)}'`);
     return response;
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -77,6 +78,7 @@ export function processShopifyResponse (shopifyResponse: ShopifyResponse, site: 
       }
 
       // Push a summary object for each stock item
+      // @ts-ignore
       items.push(<InventoryItem>{
         id: String(inventoryItem?.id),
         title: itemName,
