@@ -39,8 +39,8 @@ export async function getRequest (options: RequestOptions) {
  * @param { string } body
  * @returns {Promise<unknown>}
  */
-export async function postRequest (options: RequestOptions, body: string) {
-  console.debug(`Executing util::http::postRequest - postOptions: '${JSON.stringify(options)} body: '${body}'`);
+export async function postRequest (options: RequestOptions, body: Buffer) {
+  console.debug(`Executing util::http::postRequest - postOptions: '${JSON.stringify(options)} body: '${JSON.stringify(body)}'`);
   return new Promise((resolve, reject) => {
     const req = https.request(options, res => {
       let rawData = '';
@@ -65,8 +65,8 @@ export async function postRequest (options: RequestOptions, body: string) {
     });
 
     // 👇️ write the body to the Request object
-    // req.write(JSON.stringify(body));
     req.write(body);
+    // req.write(body);
     req.end();
   });
 }

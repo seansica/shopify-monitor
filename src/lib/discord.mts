@@ -8,15 +8,6 @@ const client = new SecretsManagerClient({
   region: process.env.Region ? process.env.Region : 'us-east-1'
 });
 
-export const EventTypes = {
-  Available_to_Not_Available: 0,
-  Not_Available_to_Available: 1,
-  Quantity_Changed: 2,
-  New_Inventory: 3,
-  False_Positive: 4,
-  Status_Update: 5
-};
-
 interface DiscordMessage {
   username: string;
   content: string;
@@ -91,7 +82,7 @@ export class Discord {
     };
 
     // the body must be stringified before sending the HTTP request
-    const body = JSON.stringify(message);
+    const body: Buffer = Buffer.from(JSON.stringify(message), 'utf-8');
 
     // compose the HTTP post options
     const options = {

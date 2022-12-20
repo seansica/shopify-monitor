@@ -4,10 +4,10 @@ build-ConfigFunction:
 	$(MAKE) HANDLER=src/handlers/config.mts build-lambda-common
 build-ShopifySyncFunction:
 	$(MAKE) HANDLER=src/handlers/shopify-sync.mts build-lambda-common
-build-DiscordSnsFunction:
-	$(MAKE) HANDLER=src/handlers/discord-sns.mts build-lambda-common
-build-DiscordNotificationFunction:
-	$(MAKE) HANDLER=src/handlers/discord-notification.mts build-lambda-common
+build-DiscordSnsPublisherFunction:
+	$(MAKE) HANDLER=src/handlers/discord-sns-publisher.mts build-lambda-common
+build-DiscordSnsSubscriberFunction:
+	$(MAKE) HANDLER=src/handlers/discord-sns-subscriber.mts build-lambda-common
 
 build-lambda-common:
 	npm install

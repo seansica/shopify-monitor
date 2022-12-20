@@ -2,9 +2,19 @@ import { ResponseError, ResponseSuccess } from "../lib/http.mjs";
 import { Callback, Context } from "aws-lambda";
 import { DynamoDBRecord, DynamoDBStreamEvent } from "aws-lambda/trigger/dynamodb-stream";
 import { SimpleNotificationService } from "../lib/sns.mjs";
+import { unmarshall } from "@aws-sdk/util-dynamodb";
 
 const region = process.env.Region ? process.env.Region : 'us-east-1';
 const topicArn = process.env.TOPIC_ARN;
+
+if (!region) {
+    throw new Error('region must be defined.');
+}
+if (!topicArn) {
+    throw new Error('topicArn must be defined.');
+}
+
+const sns = new SimpleNotificationService(region, topicArn);
 
 export const handler = async (event: DynamoDBStreamEvent, context: Context, callback: Callback) => {
     // All log statements are written to CloudWatch
@@ -26,56 +36,57 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
         return;
     }
 
-    if (!region) {
-        throw new Error('region must be defined.');
-    }
-    if (!topicArn) {
-        throw new Error('topicArn must be defined.');
-    }
-
     let discordMessage = '';
 
-    const oldImage = event.dynamodb.OldImage;
-    const newImage = event.dynamodb.NewImage;
+    const oldImageDynamoJson = event.dynamodb.OldImage;
+    const newImageDynamoJson = event.dynamodb.NewImage;
+
+    // @ts-ignore
+    const oldImage = unmarshall(oldImageDynamoJson);
+    // @ts-ignore
+    const newImage = unmarshall(newImageDynamoJson);
+
+    console.debug(`Unmarshalled old image - '${JSON.stringify(oldImage)}'`);
+    console.debug(`Unmarshalled new image - '${JSON.stringify(newImage)}'`);
 
     try {
         switch (event.eventName) {
             case 'INSERT': {
+                console.debug('Processing INSERT event.');
                 if (newImage != undefined) {
                     // new item was added
-                    const productName = newImage.title.S;
-                    const hyperlink = newImage.site.S;
+                    const productName = newImage.title;
+                    const hyperlink = newImage.site;
                     discordMessage = `A new product (${productName}) appeared! 🚨 Go check it out! [LINK](${hyperlink}`;
                 }
                 break;
             }
             case 'MODIFY': {
+                console.debug('Processing MODIFY event.');
                 // item is out of stock
-                if (oldImage?.quantity.N === 'true' &&
-                    newImage?.available.S === 'false') {
+                if (oldImage?.available === true && newImage?.available === false) {
                     console.debug('The item changed from Available to Not Available');
-                    const productName = newImage.title.S;
-                    const hyperlink = newImage.site.S;
+                    const productName = newImage.title;
+                    const hyperlink = newImage.site;
                     discordMessage = `Product ${productName} is no longer available...☹️ [LINK](${hyperlink})️`;
                 }
                 // item is back in stock
-                else if (oldImage?.available.S === 'false' &&
-                    newImage?.available.S === 'true') {
+                else if (oldImage?.available === false && newImage?.available === true) {
                     console.debug('The item changed from Not Available to Available');
-                    const productName = newImage.title.S;
-                    const newQuantity = newImage.quantity.N;
-                    const hyperlink = newImage.site.S;
+                    const productName = newImage.title;
+                    const newQuantity = newImage.quantity;
+                    const hyperlink = newImage.site;
                     discordMessage = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [BUY HERE](${hyperlink})`;
 
                 }
                 // item quantity changed
-                else if (oldImage?.quantity.S !== newImage?.quantity.S) {
+                else if ((oldImage?.available === newImage?.available) && (oldImage?.quantity !== newImage?.quantity)) {
                     console.debug('The item quantity changed.');
-                    const productName = newImage?.title.S;
-                    const hyperlink = newImage?.site.S;
-                    if (newImage?.quantity.S && oldImage?.quantity.S) {
-                        const oldQuantity = oldImage.quantity.N;
-                        const newQuantity = newImage.quantity.N;
+                    const productName = newImage?.title;
+                    const hyperlink = newImage?.site;
+                    if (newImage?.quantity && oldImage?.quantity) {
+                        const oldQuantity = oldImage.quantity;
+                        const newQuantity = newImage.quantity;
                         discordMessage = `Product ${productName} quantity changed from ${oldQuantity} to ${newQuantity}! [BUY HERE](${hyperlink})`;
                     } else {
                         discordMessage = `Product quantity changed - [BUY HERE](${hyperlink})`;
@@ -92,14 +103,16 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                 break;
             }
         }
-
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     }catch (e: Error) {
         console.error('Error', e.message);
         throw e;
     }
+
+    console.debug(`Set Discord message: ${discordMessage}`);
+
     // push notification
-    const sns = new SimpleNotificationService(region, topicArn);
-    return await sns.publish(discordMessage);
+    await sns.publish(discordMessage);
+    console.log(`Published Discord message.`);
 }

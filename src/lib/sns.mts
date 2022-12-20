@@ -18,9 +18,11 @@ export class SimpleNotificationService {
         // Set the AWS region in which your SNS topic is located
         // this.sns = new SNS({ region: region });
         this.sns = new SNSClient({ region: region });
+        console.log(`Initialized new SNSClient with TopicArn '${this.topicArn}' in region '${this.region}'`);
     }
 
     async publish(messageContent: string) {
+        console.log(`Received request to publish message content: ${messageContent}`);
         if (!messageContent) {
             return;
         }
@@ -31,12 +33,13 @@ export class SimpleNotificationService {
         const command = new PublishCommand(params)
         // Send the SNS message
         try {
-            return await this.sns.send(command);
+            await this.sns.send(command);
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         } catch (err: unknown) {
             console.error('Error', err);
             throw err;
         }
+        console.log(`Successfully published message.`);
     }
 }
