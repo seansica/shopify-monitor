@@ -1,8 +1,14 @@
 # Shopify Bot
 
+![AWS](https://img.shields.io/badge/Amazon_AWS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-323330?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
+![DynamoDB](https://img.shields.io/badge/Amazon%20DynamoDB-4053D6?style=for-the-badge&logo=Amazon%20DynamoDB&logoColor=white)
+![Jest](https://img.shields.io/badge/Jest-C21325?style=for-the-badge&logo=jest&logoColor=white)
+
 This project contains source code and supporting files for a serverless Shopify monitoring application that you can deploy with the AWS Serverless Application Model (AWS SAM) command line interface (CLI). 
 
-![](_docs/shopify-bot.png)
+![](_docs/shopify-bot-overview.png)
 
 It includes the following files and folders:
 
@@ -115,7 +121,7 @@ model. The `type: "SITE"` property is required.
 }
 ```
 
-## Visuals
+## Visual Tour
 
 After the app has been deployed, here are some screenshots to give you an idea of what is deployed:
 
@@ -124,8 +130,30 @@ Two DynamoDB tables are initialized:
 - `InventoryTable` for storing items scraped from Shopify targets
 
 ![](_docs/dynamo-tables.png)
-![](_docs/inventory-table.png)
+![](_docs/shopify-bot-config-table.png)
+![](_docs/shopify-bot-inventory-table.png)
 
 Four Lambda functions are deployed:
 
-![](_docs/lambda-functions.png)
+![](_docs/shopify-bot-functions.png)
+
+One SNS Topic and one subscription is initialized:
+
+![](_docs/shopify-bot-sns-overview.png)
+
+One secret will be initialized for the Discord API key:
+
+![](_docs/shopify-bot-secrets-manager.png)
+
+One EventBridge rule will be created to schedule the `ShopifySyncFunction` to check all of the Shopify targets every 5
+minutes:
+
+![](_docs/shopify-bot-eventbridge-rule.png)
+
+And lastly, an API Gateway instance containing one `GET` endpoint and two `POST` endpoints will be initialized.
+
+- `GET {api-root}` : triggers `ShopifySyncFunction` (helpful if you don't want to wait the 5 minutes for the bot the check the Shopify targets)
+- `POST {api-root}` : FUTURE RELEASE -- will trigger a general status update to post on Discord
+- `POST {api-root}/config?site=` : adds Shopify targets to the `ConfigTable`
+
+![](_docs/shopify-bot-api-gw.png)
