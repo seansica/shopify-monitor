@@ -1,8 +1,14 @@
 # Shopify Bot
 
+![AWS](https://img.shields.io/badge/Amazon_AWS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-323330?style=for-the-badge&logo=javascript&logoColor=F7DF1E)
+![DynamoDB](https://img.shields.io/badge/Amazon%20DynamoDB-4053D6?style=for-the-badge&logo=Amazon%20DynamoDB&logoColor=white)
+![Jest](https://img.shields.io/badge/Jest-C21325?style=for-the-badge&logo=jest&logoColor=white)
+
 This project contains source code and supporting files for a serverless Shopify monitoring application that you can deploy with the AWS Serverless Application Model (AWS SAM) command line interface (CLI). 
 
-![](docs/shopify-bot.png)
+![](_docs/shopify-bot-overview.png)
 
 It includes the following files and folders:
 
@@ -18,9 +24,13 @@ The application uses several AWS resources, including Lambda functions, an API G
 ```bash
 # test locally
 sudo sam local invoke "ShopifySyncFunction" -e events/event-get-all-items.json
-sudo sam local invoke "DiscordNotificationFunction" -e events/event-post-item.json
+sudo sam local invoke "ShopifySnsPublisherFunction" -e events/event-sns-back-in-stock.json
+sudo sam local invoke "ShopifySnsPublisherFunction" -e events/event-sns-sold-out.json
+sudo sam local invoke "ShopifySnsPublisherFunction" -e events/event-sns-quantity-changed.json
+sudo sam local invoke "DiscordSnsSubscriberFunction" -e events/event-post-item.json # NOT WORKING YET
 
-# deploy
+# build & deploy
+sam build
 sam deploy
 
 # update the Discord API key
@@ -28,10 +38,8 @@ aws secretsmanager put-secret-value \
     --secret-id DiscordApiKey \
     --secret-string file://secrets.json
     
-# monitor shopify sites to monitor
-curl -X POST https://your-slug.execute-api.us-east-1.amazonaws.com/Prod/config\
-  ?site=https://shopifySite1.com \
-  &site=https://shopifySite2.com \
+# add shopify sites to monitor
+curl -X POST https://avu7ocpb49.execute-api.us-east-1.amazonaws.com/Prod/config\?site\=https://shop.someShopifySite.com/products/product1.js\&site\=https://shop.someShopifySite.com/products/product2.js\&site\=https://shop.someShopifySite.com/products/product3.js.js
 ```
 
 ---
@@ -72,6 +80,7 @@ Discord API will be stored. The value is set to an arbitrary placeholder, so mak
 using the app.  
 
 You can either login to the AWS Console to update the secret, _or_, if you have the AWS SDK installed, you can store the API key in the provided `secrets.template.json` file and push it as follows:
+
 ```bash
 # copy the template to a file called secrets.json
 cp secrets.template.json secrets.json
@@ -112,82 +121,46 @@ model. The `type: "SITE"` property is required.
 }
 ```
 
----
+## Visual Tour
 
-## AWS Sam CLI Notes
+After the app has been deployed, here are some screenshots to give you an idea of what is deployed:
 
+Two DynamoDB tables are initialized:
+- `ConfigTable` for storing Shopify site URLs (and possibly other things in the future)
+- `InventoryTable` for storing items scraped from Shopify targets
 
+![](_docs/dynamo-tables.png)
+![](_docs/shopify-bot-config-table.png)
+![](_docs/shopify-bot-inventory-table.png)
 
+Four Lambda functions are deployed:
 
-## Use the AWS SAM CLI to build and test locally
+![](_docs/shopify-bot-functions.png)
 
-Build your application by using the `sam build` command.
+One SNS Topic and one subscription is initialized:
 
-```bash
-my-application$ sam build
-```
+![](_docs/shopify-bot-sns-overview.png)
 
-The AWS SAM CLI installs dependencies that are defined in `package.json`, creates a deployment package, and saves it in the `.aws-sam/build` folder.
+One secret will be initialized for the Discord API key:
 
-Test a single function by invoking it directly with a test event. An event is a JSON document that represents the input that the function receives from the event source. Test events are included in the `events` folder in this project.
+![](_docs/shopify-bot-secrets-manager.png)
 
-Run functions locally and invoke them with the `sam local invoke` command.
+One EventBridge rule will be created to schedule the `ShopifySyncFunction` to check all of the Shopify targets every 5
+minutes:
 
-```bash
-sudo sam local invoke "ShopifySyncFunction" -e events/event-get-all-items.json
-sudo sam local invoke "DiscordNotificationFunction" -e events/event-post-item.json
-```
+![](_docs/shopify-bot-eventbridge-rule.png)
 
-The AWS SAM CLI can also emulate your application's API. Use the `sam local start-api` command to run the API locally on port 3000.
+And lastly, an API Gateway instance containing one `GET` endpoint and two `POST` endpoints will be initialized.
 
-```bash
-my-application$ sam local start-api
-my-application$ curl http://localhost:3000/
-```
+- `GET {api-root}` : triggers `ShopifySyncFunction` (helpful if you don't want to wait the 5 minutes for the bot the check the Shopify targets)
+- `POST {api-root}` : FUTURE RELEASE -- will trigger a general status update to post on Discord
+- `POST {api-root}/config?site=` : adds Shopify targets to the `ConfigTable`
 
-The AWS SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
+![](_docs/shopify-bot-api-gw.png)
 
-```yaml
-      Events:
-        Api:
-          Type: Api
-          Properties:
-            Path: /
-            Method: GET
-```
+# Roadmap
 
-## Fetch, tail, and filter Lambda function logs
-
-To simplify troubleshooting, the AWS SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs that are generated by your Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
-
-**NOTE:** This command works for all Lambda functions, not just the ones you deploy using AWS SAM.
-
-```bash
-my-application$ sam logs -n putItemFunction --stack-name sam-app --tail
-```
-
-**NOTE:** This uses the logical name of the function within the stack. This is the correct name to use when searching logs inside an AWS Lambda function within a CloudFormation stack, even if the deployed function name varies due to CloudFormation's unique resource name generation.
-
-You can find more information and examples about filtering Lambda function logs in the [AWS SAM CLI documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
-
-## Unit tests
-
-Tests are defined in the `__tests__` folder in this project. Use `npm` to install the [Jest test framework](https://jestjs.io/) and run unit tests.
-
-```bash
-my-application$ npm install
-my-application$ npm run test
-```
-
-## Cleanup
-
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
-
-```bash
-aws cloudformation delete-stack --stack-name keeb-bot
-```
-
-## Visuals
-
-Here is a more detailed breakdown:
-![](docs/shopify-bot-updates.png)
+1. A function will be added that will allow users to trigger status updates on Discord proactively.
+2. A configuration option will be added for modifying Discord parameters such as channel and the bot username.
+3. The CloudFormation template will be replaced with the CDK.
+4. An SPA wrapper may be built to allow for an interactive user experience, i.e., show a visual overview of the InventoryTable.

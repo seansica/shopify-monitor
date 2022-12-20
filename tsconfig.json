@@ -1,19 +1,21 @@
 {
   "compilerOptions": {
     "target": "es2020",
-    "outDir": "./build",
-    "allowJs": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "allowJs": false,
     "strict": true,
     "preserveConstEnums": true,
-    "noEmit": true,
-    "sourceMap": false,
-    "module":"es6",
+    "noEmit": false,
+    "sourceMap": true,
+    "module": "esnext",
     "moduleResolution":"node",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "useUnknownInCatchVariables": true
   },
   "include": ["./src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.mjs"]
+  "exclude": ["node_modules", "**/*.test.mts", "**/*.test.mjs"]
 }
