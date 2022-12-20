@@ -38,21 +38,19 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
 
     let discordMessage = '';
 
-    const oldImageDynamoJson = event.dynamodb.OldImage;
-    const newImageDynamoJson = event.dynamodb.NewImage;
-
-    // @ts-ignore
-    const oldImage = unmarshall(oldImageDynamoJson);
-    // @ts-ignore
-    const newImage = unmarshall(newImageDynamoJson);
-
-    console.debug(`Unmarshalled old image - '${JSON.stringify(oldImage)}'`);
-    console.debug(`Unmarshalled new image - '${JSON.stringify(newImage)}'`);
-
     try {
         switch (event.eventName) {
             case 'INSERT': {
                 console.debug('Processing INSERT event.');
+
+                // Unmarshall the new item
+
+                // @ts-ignore
+                const newImage = unmarshall(event.dynamodb.NewImage);
+                console.debug(`Unmarshalled new image - '${JSON.stringify(newImage)}'`);
+
+                // Process a Discord message for the new item
+
                 if (newImage != undefined) {
                     // new item was added
                     const productName = newImage.title;
@@ -63,6 +61,20 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
             }
             case 'MODIFY': {
                 console.debug('Processing MODIFY event.');
+
+                // Unmarshall both the old and new images
+
+                // @ts-ignore
+                const oldImage = unmarshall(event.dynamodb.OldImage);
+                // @ts-ignore
+                const newImage = unmarshall(event.dynamodb.NewImage);
+
+                console.debug(`Unmarshalled old image - '${JSON.stringify(oldImage)}'`);
+                console.debug(`Unmarshalled new image - '${JSON.stringify(newImage)}'`);
+
+                // Process a Discord message based on whether the item went out of stock, is back in stock, or the
+                // quantity available just changed
+
                 // item is out of stock
                 if (oldImage?.available === true && newImage?.available === false) {
                     console.debug('The item changed from Available to Not Available');
