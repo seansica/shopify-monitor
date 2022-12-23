@@ -84,30 +84,30 @@ Resources:
                 MaximumEventAgeInSeconds: 86400
                 MaximumRetryAttempts: 185
 
-  DiscordSnsPublisherFunction:
+  InventoryUpdatePublisherFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/discord-sns-publisher.handler
+      Handler: dist/handlers/inventory-update-publisher.handler
       Architectures:
         - x86_64
       Policies:
         - SNSCrudPolicy:
-            TopicName: !Ref DiscordSNSTopic
+            TopicName: !Ref InventoryUpdateTopic
         - Statement:
             - Sid: SNSPublish
               Effect: Allow
               Action:
                 - sns:Publish
-              Resource: !Ref DiscordSNSTopic
+              Resource: !Ref InventoryUpdateTopic
       Description: |2
         Receives DynamoDB event streams from the InventoryTable and decides whether a Discord message should be sent. If
-        so, then craft notify the SNS Topic. DiscordSnsSubscriberFunction subscribes and sends messages from the queue.
+        so, then craft notify the SNS Topic. DiscordSubscriberFunction subscribes and sends messages from the queue.
       Environment:
         Variables:
-          TOPIC_ARN: !Ref DiscordSNSTopic
+          TOPIC_ARN: !Ref InventoryUpdateTopic
       Events:
         StreamEvent:
           Type: DynamoDB
@@ -117,28 +117,62 @@ Resources:
             BatchSize: 1
             Enabled: true
 
-  DiscordSNSTopic:
-    # The DiscordSns Lambda function sends messages to the topic.
-    # The DiscordSnsSubscriberFunction Lambda function subscribes to this topic.
-    Type: "AWS::SNS::Topic"
+  AllowSnsTopicToInvokeDiscordFunction:
+    Type: AWS::Lambda::Permission
     Properties:
-      DisplayName: "Discord Message Queue"
-      Subscription:
-        - Endpoint:
-            Fn::GetAtt:
-              - 'DiscordSnsSubscriberFunction'
-              - 'Arn'
-          Protocol: "lambda"
-      TopicName: "DiscordSNSTopic"
+      FunctionName: !Ref DiscordSubscriberFunction
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref InventoryUpdateTopic
 
-  DiscordSnsSubscriberFunction:
+  SubscribeDiscordFunctionToInventoryTopic:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref InventoryUpdateTopic
+      Protocol: lambda
+      Endpoint: !GetAtt DiscordSubscriberFunction.Arn
+
+  InventoryUpdateTopic:
+    # The DiscordSns Lambda function sends messages to the topic.
+    # The DiscordSubscriberFunction Lambda function subscribes to this topic.
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: InventoryUpdateTopic.fifo
+      DisplayName: Shopify Inventory Update Topic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+#      Subscription:
+#        - Protocol: lambda
+#          Endpoint: !GetAtt DiscordSubscriberFunction.Arn
+#            Fn::GetAtt:
+#              - 'DiscordSubscriberFunction'
+#              - 'Arn'
+
+#  InventoryUpdateQueue:
+#    Type: AWS::SQS::Queue
+#    Properties:
+#      QueueName: InventoryUpdateQueue
+#      DelaySeconds: 0
+#      MaximumMessageSize: 262144
+#      MessageRetentionPeriod: 1209600
+#      ReceiveMessageWaitTimeSeconds: 20
+#      VisibilityTimeout: 30
+#
+#  InventoryUpdateQueue_TopicSubscription:
+#    Type: AWS::SNS::Subscription
+#    Properties:
+#      TopicArn: !Ref InventoryUpdateTopic
+#      Protocol: sqs
+#      Endpoint: !GetAtt InventoryUpdateQueue.Arn
+
+  DiscordSubscriberFunction:
     # This Lambda function sends Discord messages via HTTP webhook
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/discord-sns-subscriber.handler
+      Handler: dist/handlers/discord-subscriber.handler
       Architectures:
         - x86_64
       Description: Sends a Discord notification when a product is available
@@ -168,19 +202,7 @@ Resources:
           Type: SNS
           Properties:
             Topic:
-              Ref: DiscordSNSTopic
-        # Uncomment the following Schedule event if you would prefer to automatically run the
-        # DiscordSnsSubscriberFunction on a regular schedule:
-        # Schedule:
-        #   Type: Schedule
-        #   Properties:
-        #     Schedule: rate(5 minutes)
-        #     Name: DiscordSnsSubscriberFunctionSchedule
-        #     Description: Schedules the DiscordSnsSubscriberFunction to run every 5 minutes
-        #     Enabled: true
-        #     RetryPolicy:
-        #         MaximumEventAgeInSeconds: 86400
-        #         MaximumRetryAttempts: 185
+              Ref: InventoryUpdateTopic
 
   RuntimeDependenciesLayer:
     Type: AWS::Serverless::LayerVersion

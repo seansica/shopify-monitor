@@ -55,7 +55,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     // new item was added
                     const productName = newImage.title;
                     const hyperlink = newImage.site;
-                    discordMessage = `A new product (${productName}) appeared! 🚨 Go check it out! [LINK](${hyperlink}`;
+                    discordMessage = `A new product (${productName}) appeared! 🚨 Go check it out! [Product Link](${hyperlink})`;
                 }
                 break;
             }
@@ -80,7 +80,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     console.debug('The item changed from Available to Not Available');
                     const productName = newImage.title;
                     const hyperlink = newImage.site;
-                    discordMessage = `Product ${productName} is no longer available...☹️ [LINK](${hyperlink})️`;
+                    discordMessage = `Product ${productName} is no longer available...☹️ [Product Link](${hyperlink})`;
                 }
                 // item is back in stock
                 else if (oldImage?.available === false && newImage?.available === true) {
@@ -88,7 +88,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     const productName = newImage.title;
                     const newQuantity = newImage.quantity;
                     const hyperlink = newImage.site;
-                    discordMessage = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [BUY HERE](${hyperlink})`;
+                    discordMessage = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [Product Link](${hyperlink})`;
 
                 }
                 // item quantity changed
@@ -99,7 +99,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     if (newImage?.quantity && oldImage?.quantity) {
                         const oldQuantity = oldImage.quantity;
                         const newQuantity = newImage.quantity;
-                        discordMessage = `Product ${productName} quantity changed from ${oldQuantity} to ${newQuantity}! [BUY HERE](${hyperlink})`;
+                        discordMessage = `Product ${productName} quantity changed from ${oldQuantity} to ${newQuantity}! [Product Link](${hyperlink})`;
                     } else {
                         discordMessage = `Product quantity changed - [BUY HERE](${hyperlink})`;
                     }
