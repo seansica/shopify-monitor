@@ -13,8 +13,8 @@ Globals:
       Variables:
         Region: 'us-east-1'
     Runtime: nodejs18.x
-    MemorySize: 128
-    Timeout: 100
+    MemorySize: 128 # MB
+    Timeout: 6 # seconds, default: 3
 
 Resources:
 
@@ -84,30 +84,38 @@ Resources:
                 MaximumEventAgeInSeconds: 86400
                 MaximumRetryAttempts: 185
 
-  InventoryUpdatePublisherFunction:
+  QueuePublisherFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/inventory-update-publisher.handler
+      Handler: dist/handlers/queue-publisher.handler
       Architectures:
         - x86_64
       Policies:
-        - SNSCrudPolicy:
-            TopicName: !Ref InventoryUpdateTopic
         - Statement:
-            - Sid: SNSPublish
-              Effect: Allow
+            # Adds the necessary permissions for the Lambda function to write to the SQS queue
+            - Effect: Allow
               Action:
-                - sns:Publish
-              Resource: !Ref InventoryUpdateTopic
+                - sqs:SendMessage
+              Resource: !GetAtt InventoryUpdateQueue.Arn
+#      Policies:
+#        - SNSCrudPolicy:
+#            TopicName: !Ref InventoryUpdateTopic
+#        - Statement:
+#            - Sid: SNSPublish
+#              Effect: Allow
+#              Action:
+#                - sns:Publish
+#              Resource: !Ref InventoryUpdateTopic
       Description: |2
         Receives DynamoDB event streams from the InventoryTable and decides whether a Discord message should be sent. If
-        so, then craft notify the SNS Topic. DiscordSubscriberFunction subscribes and sends messages from the queue.
+        so, then craft notify the SNS Topic. DiscordNotifierFunction subscribes and sends messages from the queue.
       Environment:
         Variables:
-          TOPIC_ARN: !Ref InventoryUpdateTopic
+          QUEUE_URL: !Ref InventoryUpdateQueue
+#          TOPIC_ARN: !Ref InventoryUpdateTopic
       Events:
         StreamEvent:
           Type: DynamoDB
@@ -117,35 +125,42 @@ Resources:
             BatchSize: 1
             Enabled: true
 
-  AllowSnsTopicToInvokeDiscordFunction:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref DiscordSubscriberFunction
-      Action: lambda:InvokeFunction
-      Principal: sns.amazonaws.com
-      SourceArn: !Ref InventoryUpdateTopic
+#  AllowSnsTopicToInvokeDiscordFunction:
+#    Type: AWS::Lambda::Permission
+#    Properties:
+#      FunctionName: !Ref DiscordNotifierFunction
+#      Action: lambda:InvokeFunction
+#      Principal: sns.amazonaws.com
+#      SourceArn: !Ref InventoryUpdateTopic
 
-  SubscribeDiscordFunctionToInventoryTopic:
-    Type: AWS::SNS::Subscription
-    Properties:
-      TopicArn: !Ref InventoryUpdateTopic
-      Protocol: lambda
-      Endpoint: !GetAtt DiscordSubscriberFunction.Arn
+#  SubscribeDiscordFunctionToInventoryTopic:
+#    Type: AWS::SNS::Subscription
+#    Properties:
+#      TopicArn: !Ref InventoryUpdateTopic
+#      Protocol: lambda
+#      Endpoint: !GetAtt DiscordNotifierFunction.Arn
 
-  InventoryUpdateTopic:
-    # The DiscordSns Lambda function sends messages to the topic.
-    # The DiscordSubscriberFunction Lambda function subscribes to this topic.
-    Type: AWS::SNS::Topic
+  InventoryUpdateQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      TopicName: InventoryUpdateTopic.fifo
-      DisplayName: Shopify Inventory Update Topic
-      FifoTopic: true
+      FifoQueue: true
+      QueueName: InventoryUpdateQueue.fifo
       ContentBasedDeduplication: true
+
+#  InventoryUpdateTopic:
+#    # The DiscordSns Lambda function sends messages to the topic.
+#    # The DiscordNotifierFunction Lambda function subscribes to this topic.
+#    Type: AWS::SNS::Topic
+#    Properties:
+#      TopicName: InventoryUpdateTopic.fifo
+#      DisplayName: Shopify Inventory Update Topic
+#      FifoTopic: true
+#      ContentBasedDeduplication: true
 #      Subscription:
 #        - Protocol: lambda
-#          Endpoint: !GetAtt DiscordSubscriberFunction.Arn
+#          Endpoint: !GetAtt DiscordNotifierFunction.Arn
 #            Fn::GetAtt:
-#              - 'DiscordSubscriberFunction'
+#              - 'DiscordNotifierFunction'
 #              - 'Arn'
 
 #  InventoryUpdateQueue:
@@ -157,7 +172,7 @@ Resources:
 #      MessageRetentionPeriod: 1209600
 #      ReceiveMessageWaitTimeSeconds: 20
 #      VisibilityTimeout: 30
-#
+
 #  InventoryUpdateQueue_TopicSubscription:
 #    Type: AWS::SNS::Subscription
 #    Properties:
@@ -165,21 +180,21 @@ Resources:
 #      Protocol: sqs
 #      Endpoint: !GetAtt InventoryUpdateQueue.Arn
 
-  DiscordSubscriberFunction:
+  DiscordNotifierFunction:
     # This Lambda function sends Discord messages via HTTP webhook
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/discord-subscriber.handler
+      Handler: dist/handlers/discord-notifier.handler
       Architectures:
         - x86_64
       Description: Sends a Discord notification when a product is available
       Policies:
-        - DynamoDBCrudPolicy:
-            # Grants Create/Read/Update/Delete Permissions on the table
-            TableName: !Ref InventoryTable
+#        - DynamoDBCrudPolicy:
+#            # Grants Create/Read/Update/Delete Permissions on the table
+#            TableName: !Ref InventoryTable
         - DynamoDBStreamReadPolicy:
             # Grants the DescribeStream, GetRecords, GetShardIterator, ListStreams actions on the table
             TableName: !Ref InventoryTable
@@ -190,19 +205,25 @@ Resources:
       Environment:
         Variables:
           # Make table name accessible as environment variable from function code during execution
-          INVENTORY_TABLE: !Ref InventoryTable
+          #INVENTORY_TABLE: !Ref InventoryTable
           DISCORD_SECRET_ARN: !Ref DiscordApiKey
+          QUEUE_URL: !Ref InventoryUpdateQueue
       Events:
         Api:
           Type: Api
           Properties:
             Path: /
             Method: POST
-        SNSEvent:
-          Type: SNS
+#        SNSEvent:
+#          Type: SNS
+#          Properties:
+#            Topic:
+#              Ref: InventoryUpdateTopic
+        SQSEvent:
+          Type: SQS
           Properties:
-            Topic:
-              Ref: InventoryUpdateTopic
+            Queue: !GetAtt InventoryUpdateQueue.Arn
+            #BatchSize: 10
 
   RuntimeDependenciesLayer:
     Type: AWS::Serverless::LayerVersion

@@ -8,6 +8,7 @@
         "@aws-sdk/client-dynamodb": "^3.188.0",
         "@aws-sdk/client-secrets-manager": "^3.224.0",
         "@aws-sdk/client-sns": "^3.231.0",
+        "@aws-sdk/client-sqs": "^3.238.0",
         "@aws-sdk/lib-dynamodb": "^3.188.0",
         "@aws-sdk/util-dynamodb": "^3.231.0",
         "@types/aws-lambda": "^8.10.109",

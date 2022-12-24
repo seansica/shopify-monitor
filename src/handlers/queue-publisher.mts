@@ -1,27 +1,27 @@
 import { ResponseError, ResponseSuccess } from "../lib/http.mjs";
 import { Callback, Context } from "aws-lambda";
 import { DynamoDBRecord, DynamoDBStreamEvent } from "aws-lambda/trigger/dynamodb-stream";
-import { SimpleNotificationService } from "../lib/sns.mjs";
+import { MySQSClient } from "../lib/sqs.mjs";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
 
 const region = process.env.Region ? process.env.Region : 'us-east-1';
-const topicArn = process.env.TOPIC_ARN;
+const queueUrl = process.env.QUEUE_URL;
 
 if (!region) {
-    throw new Error('region must be defined.');
+    throw new Error('process.env.Region must be defined.');
 }
-if (!topicArn) {
-    throw new Error('topicArn must be defined.');
+if (!queueUrl) {
+    throw new Error('process.env.QUEUE_URL must be defined.');
 }
 
-const sns = new SimpleNotificationService(region, topicArn);
+const sqs = new MySQSClient(queueUrl);
 
 export const handler = async (event: DynamoDBStreamEvent, context: Context, callback: Callback) => {
     // All log statements are written to CloudWatch
     console.info('Received event:', JSON.stringify(event));
     try {
         for (const dbRecord of event.Records) {
-            await processDiscordSnsEvent(dbRecord);
+            await processInventoryUpdate(dbRecord);
         }
         callback(undefined, new ResponseSuccess());
     } catch (err: unknown) {
@@ -30,13 +30,15 @@ export const handler = async (event: DynamoDBStreamEvent, context: Context, call
     }
 }
 
-async function processDiscordSnsEvent (event: DynamoDBRecord) {
+async function processInventoryUpdate (event: DynamoDBRecord) {
 
     if (!event.dynamodb) {
         return;
     }
 
     let discordMessage = '';
+    let oldImage;
+    let newImage;
 
     try {
         switch (event.eventName) {
@@ -55,7 +57,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     // new item was added
                     const productName = newImage.title;
                     const hyperlink = newImage.site;
-                    discordMessage = `A new product (${productName}) appeared! 🚨 Go check it out! [Product Link](${hyperlink})`;
+                    discordMessage = `New product ([${productName}](${hyperlink})) appeared! 🚨`;
                 }
                 break;
             }
@@ -65,9 +67,9 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                 // Unmarshall both the old and new images
 
                 // @ts-ignore
-                const oldImage = unmarshall(event.dynamodb.OldImage);
+                oldImage = unmarshall(event.dynamodb.OldImage);
                 // @ts-ignore
-                const newImage = unmarshall(event.dynamodb.NewImage);
+                newImage = unmarshall(event.dynamodb.NewImage);
 
                 console.debug(`Unmarshalled old image - '${JSON.stringify(oldImage)}'`);
                 console.debug(`Unmarshalled new image - '${JSON.stringify(newImage)}'`);
@@ -80,7 +82,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     console.debug('The item changed from Available to Not Available');
                     const productName = newImage.title;
                     const hyperlink = newImage.site;
-                    discordMessage = `Product ${productName} is no longer available...☹️ [Product Link](${hyperlink})`;
+                    discordMessage = `Product ([${productName}](${hyperlink})) is no longer available...☹️`;
                 }
                 // item is back in stock
                 else if (oldImage?.available === false && newImage?.available === true) {
@@ -88,7 +90,7 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     const productName = newImage.title;
                     const newQuantity = newImage.quantity;
                     const hyperlink = newImage.site;
-                    discordMessage = `Product ${productName} is available! 🥳 (${newQuantity || 'unknown number of'} units available) - [Product Link](${hyperlink})`;
+                    discordMessage = `Product ([${productName}](${hyperlink})) is available! 🥳 (${newQuantity || 'unknown number of'} units available)`;
 
                 }
                 // item quantity changed
@@ -99,9 +101,9 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
                     if (newImage?.quantity && oldImage?.quantity) {
                         const oldQuantity = oldImage.quantity;
                         const newQuantity = newImage.quantity;
-                        discordMessage = `Product ${productName} quantity changed from ${oldQuantity} to ${newQuantity}! [Product Link](${hyperlink})`;
+                        discordMessage = `Product ([${productName}](${hyperlink})) quantity changed from ${oldQuantity} to ${newQuantity}!`;
                     } else {
-                        discordMessage = `Product quantity changed - [BUY HERE](${hyperlink})`;
+                        discordMessage = `Product ([${productName}](${hyperlink})) quantity changed.`;
                     }
                 }
                 break;
@@ -125,6 +127,8 @@ async function processDiscordSnsEvent (event: DynamoDBRecord) {
     console.debug(`Set Discord message: ${discordMessage}`);
 
     // push notification
-    await sns.publish(discordMessage);
+
+    // @ts-ignore
+    await sqs.publish(discordMessage, 'default');
     console.log(`Published Discord message.`);
 }
