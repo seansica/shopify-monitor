@@ -1,6 +1,7 @@
 // import { SNS } from "aws-sdk";
 import { SNSClient, PublishCommand, PublishCommandInput } from "@aws-sdk/client-sns";
-export class SimpleNotificationService {
+
+export class MySNSClient {
 
     private readonly region: string;
     private readonly topicArn: string;
