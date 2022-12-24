@@ -109,12 +109,25 @@ async function processInventoryUpdate (event: DynamoDBRecord) {
                 break;
             }
             case 'REMOVE': {
-                // removals are not supported yet
-                console.warn('Removals are not supported yet');
-                if (event.dynamodb && !('NewImage' in event.dynamodb)) {
-                    // do nothing
+                console.debug('Processing REMOVE event.');
+
+                if (event.dynamodb && !('OldImage' in event.dynamodb)) {
+                    // do nothing - there is something wrong
+                    // OldImage should always be present in removals
+                    break;
                 }
-                break;
+
+                // Unmarshall the old image
+
+                // @ts-ignore
+                oldImage = unmarshall(event.dynamodb.OldImage);
+
+                console.debug(`Unmarshalled old image - '${JSON.stringify(oldImage)}'`);
+
+                const productName = oldImage.title;
+                const hyperlink = oldImage.site;
+
+                discordMessage = `Product ([${productName}](${hyperlink})) has been removed from the store...☹️`;
             }
         }
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
