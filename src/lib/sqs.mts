@@ -1,4 +1,4 @@
-import { SQSClient, SendMessageCommand, SendMessageCommandInput, DeleteMessageCommand, DeleteMessageCommandInput } from '@aws-sdk/client-sqs';
+import { SQSClient, SendMessageCommand, SendMessageCommandInput, DeleteMessageCommand } from '@aws-sdk/client-sqs';
 
 export class MySQSClient {
 

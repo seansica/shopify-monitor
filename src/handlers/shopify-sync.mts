@@ -1,4 +1,4 @@
-import { Shopify } from '../lib/shopify/index.mjs';
+import * as Shopify from '../lib/shopify/shopify.mjs';
 import { Product } from '../lib/shopify/types.mjs';
 import { Database } from '../lib/database/index.mjs';
 import { ResponseError, ResponseSuccess } from '../lib/http.mjs';

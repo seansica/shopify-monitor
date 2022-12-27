@@ -1,4 +1,3 @@
-// import { SNS } from "aws-sdk";
 import { SNSClient, PublishCommand, PublishCommandInput } from "@aws-sdk/client-sns";
 
 export class MySNSClient {
