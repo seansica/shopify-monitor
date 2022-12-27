@@ -5,7 +5,7 @@ import { ResponseError, ResponseSuccess } from "../lib/http.mjs";
 // Get environment variables - set by CloudFormation/SAM
 
 const configTableName = process.env.CONFIG_TABLE;
-if (!configTableName) throw new Error('CONFIG_TABLE is undefined.');
+if (!configTableName) throw new Error('process.env.CONFIG_TABLE is undefined.');
 
 /**
  * Perform various config actions on the Config Table

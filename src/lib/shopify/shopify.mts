@@ -1,7 +1,8 @@
-import { getRequest } from './http.mjs';
+import { getRequest } from '../http.mjs';
 import { RequestOptions } from "http";
-import { ShopifyResponse, ShopifyProduct } from '../types/shopify-response.mjs';
-import { InventoryItem } from "../types/inventory-event.mjs";
+import { Product, Variant } from "./types.mjs";
+import { InventoryItem } from "../database/types.mjs";
+
 const fileExtensionMatchPattern = /\.[^/.]+$/; // RegEx to match file extensions like '.jpeg', '.js', '.html', etc.
 
 
@@ -30,7 +31,7 @@ export async function sendShopifyRequest (hostname: string, pathname: string) {
   try {
     // Send a request to the Shopify site
     // @ts-ignore
-    const response = <ShopifyResponse>await getRequest(options);
+    const response = <Product>await getRequest(options);
     console.debug(`Shopify Response is '${JSON.stringify(response)}'`);
     return response;
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -44,12 +45,12 @@ export async function sendShopifyRequest (hostname: string, pathname: string) {
 
 /**
  * Parses a typical Shopify site response
- * @param {ShopifyResponse} shopifyResponse An array of Shopify stock summaries
+ * @param {Product} product An array of Shopify stock summaries
  * @param {string} site The site from which the Shopify response was received
  * @returns An array of summary objects
  */
-export function processShopifyResponse (shopifyResponse: ShopifyResponse, site: string): InventoryItem[] {
-  console.info(`Executing "shopify::processShopifyResponse - bodyJSON '${JSON.stringify(shopifyResponse)}'`);
+export function processShopifyResponse (product: Product, site: string): InventoryItem[] {
+  console.info(`Executing "shopify::processProduct - bodyJSON '${JSON.stringify(product)}'`);
 
   // Removes the trailing '.js' file extension from the site path. We don't want the hyperlink to open
   // client browser's to a blob of JSON; we want the browser to open to a pretty HTML page!
@@ -58,23 +59,35 @@ export function processShopifyResponse (shopifyResponse: ShopifyResponse, site: 
 
   const items: InventoryItem[] = []; // will be returned
 
+  if (!product.variants) {
+    throw new Error('variants is undefined.');
+  }
+
   // Iterate over all products available at the site. For each one, generate a summary object and push it onto the items list.
-  for (let i = 0; i <= shopifyResponse.variants.length; i++) {
+  for (let i = 0; i <= product.variants.length; i++) {
     // Parse each stock item
-    const inventoryItem: ShopifyProduct = shopifyResponse.variants[i];
+    const inventoryItem: Variant = product.variants[i];
 
     if (inventoryItem?.title) {
+
       // Sometimes merchants do not use 'title', in which case the title defaults to 'Default Title'.
       // This is a useless value, so we can fall back to 'name' if that occurs.
-      const itemName = inventoryItem.title === 'Default Title' ? inventoryItem?.name : inventoryItem.title;
+      // let itemName = inventoryItem.title === 'Default Title' ? inventoryItem?.name : inventoryItem.title;
+
+      // Prefer the 'name' property if it exists. Otherwise try using 'title'. If 'name' and 'title' are both invalid,
+      // then set a placeholder value.
+
+      let itemName = !!inventoryItem.name ? inventoryItem.name : inventoryItem.title;
+
+      if (!itemName || itemName == 'Default Title') {
+        itemName = '{ Unknown Product Name }';
+      }
 
       // Log the availability status of each stock item
-      {
-        if (inventoryItem?.available) {
-          console.info(`IN STOCK (${inventoryItem?.inventory_quantity})!!! --> ${itemName}`);
-        } else {
-          console.info(`NOT IN STOCK --> ${itemName}`);
-        }
+      if (inventoryItem?.available) {
+        console.info(`IN STOCK (${inventoryItem?.inventory_quantity})!!! --> ${itemName}`);
+      } else {
+        console.info(`NOT IN STOCK --> ${itemName}`);
       }
 
       // Push a summary object for each stock item

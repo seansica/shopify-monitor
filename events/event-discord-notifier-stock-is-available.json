@@ -1,0 +1,24 @@
+{
+  "Records": [
+    {
+      "messageId": "64744ff0-48d5-4aae-9b8a-f29ccf8078a8",
+      "receiptHandle": "AQEBtppoO5uQqj3+7f91W1MB5MhXJIyrzN/miJfi7D7mlN8rB8DCc1XDCUoA71y2Cg/8IuQKA1o1FKqOvxmgvBHKY+ihd0hfVQukO9Sj3Vk4ues9EiCb67vKN/3Gz5DZddJaFcfOYAcO9aTgnXWAxNSQoltE2OFw+dSS8h5NCNP9YFzf3Lq5gCADi+Z/by8IXO+1n6o9X4CMkX3Ang1SydykbsuZK3qTBgrSgVzEwL6TFhUCm+9D5KVzG8yMXQ3hWFrVcCnWTqt/i2Wxwwwz20muQNyvw0I9VwkLzAqGhwPaxiY=",
+      "body": "Product [White ABS Switch Plate](https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition) is available! 🥳 (7 units available)",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "AWSTraceHeader": "Root=1-63a68082-6590d50b68dd22f01e792b47;Parent=56ca460132dd05b5;Sampled=0",
+        "SentTimestamp": "1671856259936",
+        "SequenceNumber": "18874739276253167872",
+        "MessageGroupId": "https://shop.norbauer.com/products/the-heavy-grail-ghost-of-christmas-future-edition",
+        "SenderId": "AROAUZADG3WGIBQJRZXYO:shopify-bot-QueuePublisherFunction-7EnHTlLQUGPD",
+        "MessageDeduplicationId": "bf9a324aaac4b180dc1fdfc80c27fc9b64d06677bcc92cfa1718892ddb5738b0",
+        "ApproximateFirstReceiveTimestamp": "1671856259936"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "9c0b076ef4a2264b6a22a2eb8c941ff6",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:328571739532:InventoryUpdateQueue.fifo",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}
