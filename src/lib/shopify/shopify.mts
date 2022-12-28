@@ -50,7 +50,7 @@ export async function sendShopifyRequest (hostname: string, pathname: string) {
  * @returns An array of summary objects
  */
 export function processShopifyResponse (product: Product, site: string): InventoryItem[] {
-  console.info(`Executing "shopify::processProduct - bodyJSON '${JSON.stringify(product)}'`);
+  console.info('Executing shopify::processShopifyResponse');
 
   // Removes the trailing '.js' file extension from the site path. We don't want the hyperlink to open
   // client browser's to a blob of JSON; we want the browser to open to a pretty HTML page!
@@ -70,18 +70,10 @@ export function processShopifyResponse (product: Product, site: string): Invento
 
     if (inventoryItem?.title) {
 
-      // Sometimes merchants do not use 'title', in which case the title defaults to 'Default Title'.
-      // This is a useless value, so we can fall back to 'name' if that occurs.
-      // let itemName = inventoryItem.title === 'Default Title' ? inventoryItem?.name : inventoryItem.title;
-
-      // Prefer the 'name' property if it exists. Otherwise try using 'title'. If 'name' and 'title' are both invalid,
+      // Prefer the 'name' property if it exists. Otherwise, try using 'title'. If 'name' and 'title' are both invalid,
       // then set a placeholder value.
-
       let itemName = !!inventoryItem.name ? inventoryItem.name : inventoryItem.title;
-
-      if (!itemName || itemName == 'Default Title') {
-        itemName = '{ Unknown Product Name }';
-      }
+      if (!itemName || itemName == 'Default Title') itemName = 'UnknownProductName';
 
       // Log the availability status of each stock item
       if (inventoryItem?.available) {
@@ -90,16 +82,24 @@ export function processShopifyResponse (product: Product, site: string): Invento
         console.info(`NOT IN STOCK --> ${itemName}`);
       }
 
+      // If `available` property is undefined, then set to false
+      const available = inventoryItem?.available ? inventoryItem?.available : false;
+
+      // If `quantity` property is undefined, then set to zero
+      const quantity = inventoryItem?.inventory_quantity ? inventoryItem?.inventory_quantity : 0;
+
       // Push a summary object for each stock item
+
       // @ts-ignore
       items.push(<InventoryItem>{
         id: String(inventoryItem?.id),
         title: itemName,
-        available: inventoryItem?.available,
-        quantity: inventoryItem?.inventory_quantity,
+        available: available,
+        quantity: quantity,
         site: hyperlink
       });
     }
   }
+  console.debug(`Processed ${items.length} items.`);
   return items;
 }
