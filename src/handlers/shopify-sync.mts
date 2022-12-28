@@ -22,11 +22,16 @@ if (!configTableName) throw new Error('CONFIG_TABLE must be defined.');
  * @returns
  */
 export const handler = async (event: APIGatewayEvent, context: Context, callback: APIGatewayProxyCallback) => {
-  if ('httpMethod' in event && event.httpMethod !== 'GET') {
-    throw new Error(`getAllItems only accept GET method, you tried: ${event.httpMethod}`);
-  }
+
   // All log statements are written to CloudWatch
   console.info('Received event:', event);
+
+  if (event.httpMethod !== 'POST') {
+    throw new Error(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
+  }
+  if (event.path !== '/sync') {
+    throw new Error(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
+  }
 
   // Retrieve the list of Shopify site URLs to check from the ConfigTable
   const configItems = await Database.scanItems(configTableName)
