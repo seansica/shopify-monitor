@@ -133,7 +133,7 @@ Two DynamoDB tables are initialized:
 - `ConfigTable` for storing Shopify site URLs (and possibly other things in the future)
 - `InventoryTable` for storing items scraped from Shopify targets
 
-![](_docs/dynamo-tables.png)
+![](_docs/shopify-bot-dynamo-tables.png)
 ![](_docs/shopify-bot-config-table.png)
 ![](_docs/shopify-bot-inventory-table.png)
 
@@ -141,9 +141,9 @@ Four Lambda functions are deployed:
 
 ![](_docs/shopify-bot-functions.png)
 
-One SNS Topic and one subscription is initialized:
+One SQS instance is initialized. This is where all Discord messages are queued up:
 
-![](_docs/shopify-bot-sns-overview.png)
+![](_docs/shopify-bot-sqs-overview.png)
 
 One secret will be initialized for the Discord API key:
 
@@ -161,10 +161,3 @@ And lastly, an API Gateway instance containing one `GET` endpoint and two `POST`
 - `POST {api-root}/config?site=` : adds Shopify targets to the `ConfigTable`
 
 ![](_docs/shopify-bot-api-gw.png)
-
-# Roadmap
-
-1. A function will be added that will allow users to trigger status updates on Discord proactively.
-2. A configuration option will be added for modifying Discord parameters such as channel and the bot username.
-3. The CloudFormation template will be replaced with the CDK.
-4. An SPA wrapper may be built to allow for an interactive user experience, i.e., show a visual overview of the InventoryTable.
