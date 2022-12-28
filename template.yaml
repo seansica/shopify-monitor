@@ -14,7 +14,7 @@ Globals:
         Region: 'us-east-1'
     Runtime: nodejs18.x
     MemorySize: 128 # MB
-    Timeout: 6 # seconds, default: 3
+    Timeout: 6 # optional, in seconds, default is 6
 
 Resources:
 
@@ -49,6 +49,7 @@ Resources:
     Properties:
       CodeUri: .
       Handler: dist/handlers/shopify-sync.handler
+      Timeout: 10
       Architectures:
         - x86_64
       Description: Scans Shopify sites and writes updates to a DynamoDB table
