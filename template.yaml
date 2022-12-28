@@ -49,7 +49,7 @@ Resources:
     Properties:
       CodeUri: .
       Handler: dist/handlers/shopify-sync.handler
-      Timeout: 10
+      Timeout: 15
       Architectures:
         - x86_64
       Description: Scans Shopify sites and writes updates to a DynamoDB table
