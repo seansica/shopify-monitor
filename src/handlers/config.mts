@@ -19,11 +19,14 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   /** analyze the event - reject non-compliant requests */
   if ('httpMethod' in event) {
     if (event.httpMethod !== 'POST') {
-      throw new Error(`httpMethod must be POST but received ${event.httpMethod}`);
+      throw new Error(`ConfigFunction only accepts POST requests. You tried: ${event.httpMethod}`);
+    }
+    if (event.path !== "/config") {
+      throw new Error(`ConfigFunction only accepts requests on path "/config". You tried: "${event.path}"`);
     }
 
     // Process request to add new Shopify site(s) to config table
-    if (event?.multiValueQueryStringParameters?.site) {
+    if (event.multiValueQueryStringParameters?.site) {
       /**
        * You can POST multiple sites in the same request.
        * e.g., POST /config?site=www.mysite.com&site=www.mysite2.com
