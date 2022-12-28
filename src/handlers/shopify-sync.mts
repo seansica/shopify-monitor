@@ -28,13 +28,7 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   // All log statements are written to CloudWatch
   console.info('Received event:', event);
 
-  // Prepare the response
-  // const responseBuilder = new ResponseBuilder()
-  //   .setHeader('Content-Type', 'application/json')
-  //   .setBase64Encoded(false);
-
   // Retrieve the list of Shopify site URLs to check from the ConfigTable
-  // const configItems = await configTable.getAllItems();
   const configItems = await Database.scanItems(configTableName)
   if (!configItems) throw new Error('No items returned from scan.');
   const sites = [];
@@ -71,8 +65,7 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
       }
     }
 
-    callback(undefined, new ResponseSuccess(JSON.stringify(allItems)))
-    // callback(undefined, new ResponseSuccess())
+    callback(undefined, new ResponseSuccess())
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
