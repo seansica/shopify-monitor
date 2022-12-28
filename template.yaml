@@ -69,8 +69,8 @@ Resources:
         Api:
           Type: Api
           Properties:
-            Path: /
-            Method: GET
+            Path: /sync
+            Method: POST
         Schedule:
           Type: Schedule
           Properties:
