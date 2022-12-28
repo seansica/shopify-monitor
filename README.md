@@ -6,7 +6,11 @@
 ![DynamoDB](https://img.shields.io/badge/Amazon%20DynamoDB-4053D6?style=for-the-badge&logo=Amazon%20DynamoDB&logoColor=white)
 ![Jest](https://img.shields.io/badge/Jest-C21325?style=for-the-badge&logo=jest&logoColor=white)
 
-This project contains source code and supporting files for a serverless Shopify monitoring application that you can deploy with the AWS Serverless Application Model (AWS SAM) command line interface (CLI). 
+A serverless Shopify Discord monitoring application that you can deploy with the AWS Serverless Application Model (AWS SAM) command line interface (CLI). 
+
+![](_docs/shopify-bot-demo.png)
+
+## Overview
 
 ![](_docs/shopify-bot-overview.png)
 
