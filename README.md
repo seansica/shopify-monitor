@@ -28,10 +28,10 @@ The application uses several AWS resources, including Lambda functions, an API G
 ```bash
 # test locally
 sudo sam local invoke "ShopifySyncFunction" -e events/event-get-all-items.json
-sudo sam local invoke "ShopifySnsPublisherFunction" -e events/event-sns-back-in-stock.json
-sudo sam local invoke "ShopifySnsPublisherFunction" -e events/event-sns-sold-out.json
-sudo sam local invoke "ShopifySnsPublisherFunction" -e events/event-sns-quantity-changed.json
-sudo sam local invoke "DiscordSnsSubscriberFunction" -e events/event-post-item.json # NOT WORKING YET
+sudo sam local invoke "QueuePublisherFunction" -e events/event-sns-back-in-stock.json
+sudo sam local invoke "QueuePublisherFunction" -e events/event-sns-sold-out.json
+sudo sam local invoke "QueuePublisherFunction" -e events/event-sns-quantity-changed.json
+sudo sam local invoke "DiscordNotifierFunction" -e events/event-post-item.json # NOT WORKING YET
 
 # build & deploy
 sam build
@@ -42,8 +42,12 @@ aws secretsmanager put-secret-value \
     --secret-id DiscordApiKey \
     --secret-string file://secrets.json
     
-# add shopify sites to monitor
+# add a shopify monitor target
+curl -X POST https://avu7ocpb49.execute-api.us-east-1.amazonaws.com/Prod/config\?site\=https://shop.someShopifySite.com/products/product1.js
+
+# add multiple shopify monitor targets
 curl -X POST https://avu7ocpb49.execute-api.us-east-1.amazonaws.com/Prod/config\?site\=https://shop.someShopifySite.com/products/product1.js\&site\=https://shop.someShopifySite.com/products/product2.js\&site\=https://shop.someShopifySite.com/products/product3.js.js
+
 ```
 
 ---
