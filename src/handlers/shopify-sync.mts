@@ -27,10 +27,12 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   console.info('Received event:', event);
 
   if (event.httpMethod !== 'POST') {
-    throw new Error(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
+    // throw new Error(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
+    console.warn(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
   }
   if (event.path !== '/sync') {
-    throw new Error(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
+    // throw new Error(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
+    console.warn(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
   }
 
   // Retrieve the list of Shopify site URLs to check from the ConfigTable
@@ -45,38 +47,41 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
 
   let allItems: InventoryItem[] = [];
   // Get the content from the Shopify site(s)
-  try {
-    for (const site of sites) {
-      // Parse the host and path from the full website URL
-      const { pathname, hostname } = new URL(site);
-
+  for (const site of sites) {
+    // Parse the host and path from the full website URL
+    const { pathname, hostname } = new URL(site);
+    try {
       // Send a GET request to the website for a list of inventory
       const shopifyResponse: Product = await Shopify.sendShopifyRequest(hostname, pathname);
-
       // Parse the list of inventory response
       const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site);
-
       // Merge the list into the master list which will be returned when the function has completed processing
       allItems = allItems.concat(listOfStockItems);
-
-      // Add each item retrieved to the database table
-      for (const item of listOfStockItems) {
-        /**
-         * Write the content to the database.
-         * Each item will be structured like:
-         * { id: number, title: str, available: bool, quantity: number, site: str }
-         */
-        await Database.putItem(inventoryTableName, item);
+      try {
+        // Add each item retrieved to the database table
+        for (const item of listOfStockItems) {
+          /**
+           * Write the content to the database.
+           * Each item will be structured like:
+           * { id: number, title: str, available: bool, quantity: number, site: str }
+           */
+          await Database.putItem(inventoryTableName, item);
+        }
+        // @ts-ignore
+      } catch(err: Error) {
+        console.warn(`There was an error while trying to put item in database.`);
+        console.error(err.message);
       }
+      // @ts-ignore
+    } catch(err: Error) {
+      console.warn(`There was an error while sending a Shopify request to ${site}.`);
+      console.error(err.message);
     }
-
-    callback(undefined, new ResponseSuccess())
-
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-  } catch (err: Error) {
-    console.error(err.message);
-    // Failed to handle Shopify content
-    callback(new ResponseError())
   }
+  // Note that it is possible that all sync requests still fail and get caught in the above try/catch blocks.
+  // Ideally, this function should be split into two: one retrieves the list of Shopify sites from Dynamo and executes
+  // a for-loop on them facilitates the overall execution, and one that sends the Shopify request to each site. Each
+  // request should be invoked in a unique Lambda execution so that the failure of one site sync does not impact or
+  // impede another. Until then, this function will blindly return a success callback response.
+  callback(undefined, new ResponseSuccess());
 };
