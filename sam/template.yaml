@@ -24,7 +24,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/config.handler
+      Handler: ../dist/handlers/config.handler
       Architectures:
         - x86_64
       Description: Stores Shopify sites and Discord webhook parameters (excluding the secure API key - that is stored in Secrets Manager)
@@ -48,7 +48,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/shopify-sync.handler
+      Handler: ../dist/handlers/shopify-sync.handler
       Timeout: 15
       Architectures:
         - x86_64
@@ -88,7 +88,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/queue-publisher.handler
+      Handler: ../dist/handlers/queue-publisher.handler
       Architectures:
         - x86_64
       Policies:
@@ -127,7 +127,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: dist/handlers/discord-notifier.handler
+      Handler: ../dist/handlers/discord-notifier.handler
       Architectures:
         - x86_64
       Description: Sends a Discord notification when a product is available

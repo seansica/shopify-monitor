@@ -1,7 +1,7 @@
 version = 0.1
-[default]
-[default.deploy]
-[default.deploy.parameters]
+[prod]
+[prod.deploy]
+[prod.deploy.parameters]
 stack_name = "shopify-bot"
 s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1n1zoqn89o0dg"
 s3_prefix = "shopify-bot"

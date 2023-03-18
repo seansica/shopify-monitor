@@ -1,4 +1,3 @@
-.aws-sam/
 build/
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,intellij,intellij+iml,intellij+all,dotenv,node
