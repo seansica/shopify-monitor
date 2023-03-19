@@ -11,6 +11,7 @@ Globals:
       - !Ref RuntimeDependenciesLayer
     Environment:
       Variables:
+        APP_ROOT: !Sub ${AWS::StackName}/app
         Region: 'us-east-1'
     Runtime: nodejs18.x
     MemorySize: 128 # MB
@@ -24,7 +25,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: ../dist/handlers/config.handler
+      Handler: ../app/dist/handlers/config.handler
       Architectures:
         - x86_64
       Description: Stores Shopify sites and Discord webhook parameters (excluding the secure API key - that is stored in Secrets Manager)
@@ -48,7 +49,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: ../dist/handlers/shopify-sync.handler
+      Handler: ../app/dist/handlers/shopify-sync.handler
       Timeout: 15
       Architectures:
         - x86_64
@@ -88,7 +89,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: ../dist/handlers/queue-publisher.handler
+      Handler: ../app/dist/handlers/queue-publisher.handler
       Architectures:
         - x86_64
       Policies:
@@ -127,7 +128,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       CodeUri: .
-      Handler: ../dist/handlers/discord-notifier.handler
+      Handler: ../app/dist/handlers/discord-notifier.handler
       Architectures:
         - x86_64
       Description: Sends a Discord notification when a product is available
@@ -156,7 +157,7 @@ Resources:
       BuildMethod: makefile
     Properties:
       Description: Runtime dependencies for Lambdas
-      ContentUri: ./
+      ContentUri: ../app/
       CompatibleRuntimes:
         - nodejs18.x
       RetentionPolicy: Retain
