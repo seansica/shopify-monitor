@@ -1,26 +1,16 @@
-.PHONY: build-RuntimeDependenciesLayer build-lambda-common
-
-build-ConfigFunction:
-	$(MAKE) HANDLER=src/handlers/config.mts build-lambda-common
-build-ShopifySyncFunction:
-	$(MAKE) HANDLER=src/handlers/shopify-sync.mts build-lambda-common
-build-QueuePublisherFunction:
-	$(MAKE) HANDLER=src/handlers/queue-publisher.mts build-lambda-common
-build-DiscordNotifierFunction:
-	$(MAKE) HANDLER=src/handlers/discord-notifier.mts build-lambda-common
-
-build-lambda-common:
-	npm install
-	rm -rf dist
-	echo "{\"extends\": \"./tsconfig.json\", \"include\": [\"${HANDLER}\"] }" > tsconfig-only-handler.json
-	npm run build -- --build tsconfig-only-handler.json
-	#renamer --find js --replace mjs './dist/**/*.js'
-	cp -r dist "$(ARTIFACTS_DIR)/"
+.PHONY: build-RuntimeDependenciesLayer
 
 build-RuntimeDependenciesLayer:
-	mkdir -p "$(ARTIFACTS_DIR)/nodejs"
-	cp package.json package-lock.json "$(ARTIFACTS_DIR)/nodejs/"
-	npm install --production --prefix "$(ARTIFACTS_DIR)/nodejs/"
-	rm "$(ARTIFACTS_DIR)/nodejs/package.json" # to avoid rebuilding when changes doesn't relate to dependencies
+	$(MAKE) -C $(PWD)/../app build-RuntimeDependenciesLayer ARTIFACTS_DIR=$(ARTIFACTS_DIR)
 
+build-ConfigFunction:
+	$(MAKE) -C $(PWD)/../app build-ConfigFunction ARTIFACTS_DIR=$(ARTIFACTS_DIR)
 
+build-ShopifySyncFunction:
+	$(MAKE) -C $(PWD)/../app build-ShopifySyncFunction ARTIFACTS_DIR=$(ARTIFACTS_DIR)
+
+build-QueuePublisherFunction:
+	$(MAKE) -C $(PWD)/../app build-QueuePublisherFunction ARTIFACTS_DIR=$(ARTIFACTS_DIR)
+
+build-DiscordNotifierFunction:
+	$(MAKE) -C $(PWD)/../app build-DiscordNotifierFunction ARTIFACTS_DIR=$(ARTIFACTS_DIR)
