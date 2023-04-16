@@ -38,6 +38,7 @@ export class ShopifyBotStack extends cdk.Stack {
       secretName: 'DiscordApiKey',
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ 'discord-api-key': 'this-is-not-a-valid-key-please-replace' }),
+        generateStringKey: 'discord-api-key',
       },
     });
 
