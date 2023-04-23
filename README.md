@@ -37,6 +37,9 @@ sudo sam local invoke "DiscordNotifierFunction" -e events/event-post-item.json #
 sam build
 sam deploy
 
+# build and deploy dev/test stack
+sam deploy --stack-name shopify-bot-test
+
 # update the Discord API key
 aws secretsmanager put-secret-value \
     --secret-id DiscordApiKey \

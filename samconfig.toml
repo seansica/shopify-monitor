@@ -9,3 +9,15 @@ region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
+
+[dev]
+[dev.deploy]
+[dev.deploy.parameters]
+stack_name = "shopify-bot-dev"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-csuag1qx37c0"
+s3_prefix = "shopify-bot-dev"
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+profile = "AdministratorAccess-328571739532"
