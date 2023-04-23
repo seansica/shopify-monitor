@@ -200,3 +200,15 @@ export interface Currency {
     name?: string;
     symbol?: string;
 }
+
+export interface ProductsListResponse {
+    products: Array<{
+        id: number;
+        handle: string;
+    }>;
+}
+
+export interface ProductHandle {
+    id: number;
+    handle: string;
+}

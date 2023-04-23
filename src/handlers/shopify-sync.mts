@@ -46,18 +46,24 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   }
 
   let allItems: InventoryItem[] = [];
+
   // Get the content from the Shopify site(s)
   for (const site of sites) {
-    // Parse the host and path from the full website URL
-    const { pathname, hostname } = new URL(site);
     try {
-      // Send a GET request to the website for a list of inventory
-      const shopifyResponse: Product = await Shopify.sendShopifyRequest(hostname, pathname);
-      // Parse the list of inventory response
-      const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site);
-      // Merge the list into the master list which will be returned when the function has completed processing
-      allItems = allItems.concat(listOfStockItems);
-      try {
+      const { hostname } = new URL(site);
+      const products = await Shopify.fetchAllProducts(hostname);
+
+      for (const product of products) {
+
+        // Send a GET request to the website for a list of inventory
+        const productData: Product = await Shopify.sendShopifyRequest(hostname, `/products/${product.handle}.js`);
+
+        // Parse the list of inventory response
+        const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(productData, site);
+
+        // Merge the list into the master list which will be returned when the function has completed processing
+        allItems = allItems.concat(listOfStockItems);
+
         // Add each item retrieved to the database table
         for (const item of listOfStockItems) {
           /**
@@ -67,10 +73,6 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
            */
           await Database.putItem(inventoryTableName, item);
         }
-        // @ts-ignore
-      } catch(err: Error) {
-        console.warn(`There was an error while trying to put item in database.`);
-        console.error(err.message);
       }
       // @ts-ignore
     } catch(err: Error) {
