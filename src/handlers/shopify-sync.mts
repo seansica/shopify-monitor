@@ -51,29 +51,27 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   for (const site of sites) {
     try {
       const { hostname } = new URL(site);
-      const products = await Shopify.fetchAllProducts(hostname);
 
-      for (const product of products) {
+      // Get product handles and their corresponding IDs
+      const productHandles = await Shopify.fetchAllProducts(hostname);
 
-        // Send a GET request to the website for a list of inventory
-        const productData: Product = await Shopify.sendShopifyRequest(hostname, `/products/${product.handle}.js`);
 
-        // Parse the list of inventory response
-        const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(productData, site);
-
-        // Merge the list into the master list which will be returned when the function has completed processing
+      // Send a GET request to the website for a list of inventory and update the database in parallel
+      const requests = productHandles.map(async (productHandle: { handle: string; }) => {
+        const productPath = `/products/${productHandle.handle}.js`;
+        const shopifyResponse: Product = await Shopify.sendShopifyRequest(hostname, productPath);
+        const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site);
         allItems = allItems.concat(listOfStockItems);
 
         // Add each item retrieved to the database table
         for (const item of listOfStockItems) {
-          /**
-           * Write the content to the database.
-           * Each item will be structured like:
-           * { id: number, title: str, available: bool, quantity: number, site: str }
-           */
           await Database.putItem(inventoryTableName, item);
         }
-      }
+      });
+
+      // Wait for all the requests to complete
+      await Promise.all(requests);
+      
       // @ts-ignore
     } catch(err: Error) {
       console.warn(`There was an error while sending a Shopify request to ${site}.`);
