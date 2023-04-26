@@ -1,7 +1,7 @@
 import * as Shopify from '../lib/shopify/shopify.mjs';
 import { Product } from '../lib/shopify/types.mjs';
 import { Database } from '../lib/database/index.mjs';
-import { ResponseError, ResponseSuccess } from '../lib/http.mjs';
+import { ResponseSuccess } from '../lib/http.mjs';
 import { APIGatewayEvent, APIGatewayProxyCallback, Context } from 'aws-lambda';
 import { InventoryItem } from "../lib/database/types.mjs";
 
@@ -13,6 +13,10 @@ const configTableName = process.env.CONFIG_TABLE;
 if (!inventoryTableName) throw new Error('INVENTORY_TABLE must be defined.')
 if (!configTableName) throw new Error('CONFIG_TABLE must be defined.');
 
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * A simple example includes an HTTP get method to get all items from a DynamoDB table.
@@ -66,12 +70,16 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
         // Add each item retrieved to the database table
         for (const item of listOfStockItems) {
           await Database.putItem(inventoryTableName, item);
+          // Introduce a delay of 100 milliseconds between requests to avoid:
+          // Error ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table
+          // was exceeded. Consider increasing your provisioning level with the UpdateTable API.
+          await sleep(100);
         }
       });
 
       // Wait for all the requests to complete
       await Promise.all(requests);
-      
+
       // @ts-ignore
     } catch(err: Error) {
       console.warn(`There was an error while sending a Shopify request to ${site}.`);
