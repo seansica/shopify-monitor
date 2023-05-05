@@ -9,11 +9,9 @@ export const getItem = async (tableName: string, primaryKey: string) => {
                 primaryKey: primaryKey
             },
         };
-        const data = await ddbDocClient.send(new GetCommand(params));
-        console.log("Success :", data);
-        // console.log("Success :", data.Item);
-        return data;
+        return await ddbDocClient.send(new GetCommand(params));
     } catch (err) {
+        console.log(`Failed get operation in table '${tableName}'`);
         console.log("Error", err);
     }
 };
