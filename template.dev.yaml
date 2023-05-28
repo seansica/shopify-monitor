@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  shopify-bot
+
+Transform:
+- AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        Region: 'us-east-2'
+    Runtime: nodejs18.x
+    MemorySize: 128 # MB
+    Timeout: 6 # optional, in seconds, default is 6
+
+Resources:
+
+  ConfigFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/config
+      Handler: index.handler
+      Architectures:
+        - x86_64
+      Description: Stores Shopify sites and Discord webhook parameters (excluding the secure API key - that is stored in Secrets Manager)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConfigTable
+      Environment:
+        Variables:
+          # The ConfigTable stores the list of Shopify sites that the ShopifySyncFunction will check
+          CONFIG_TABLE: !Ref ConfigTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /config
+            Method: POST
+
+  ShopifySyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/shopifySync
+      Handler: index.handler
+      Timeout: 15
+      Architectures:
+        - x86_64
+      Description: Scans Shopify sites and writes updates to a DynamoDB table
+      Policies:
+          # Give Create/Read/Update/Delete Permissions to the InventoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InventoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConfigTable
+      Environment:
+        Variables:
+          # The ConfigTable stores the list of Shopify sites that the ShopifySyncFunction will check
+          CONFIG_TABLE: !Ref ConfigTable
+          # The InventoryTable stores the product/stock items that were retrieved from the sites
+          INVENTORY_TABLE: !Ref InventoryTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /sync
+            Method: POST
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Name: ShopifySyncSchedule
+            Description: Schedules the ShopifySyncFunction to run every 5 minutes
+            Enabled: true
+            RetryPolicy:
+                MaximumEventAgeInSeconds: 86400
+                MaximumRetryAttempts: 185
+
+  QueuePublisherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/queuePublisher
+      Handler: index.handler
+      Architectures:
+        - x86_64
+      Policies:
+        - Statement:
+            # Adds the necessary permissions for the Lambda function to write to the SQS queue
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt InventoryUpdateQueue.Arn
+      Description: |2
+        Receives DynamoDB event streams from the InventoryTable and decides whether a Discord message should be sent. If
+        so, then craft notify the SNS Topic. DiscordNotifierFunction subscribes and sends messages from the queue.
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref InventoryUpdateQueue
+      Events:
+        StreamEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt InventoryTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
+            Enabled: true
+
+  DiscordNotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/discordNotifier
+      Handler: index.handler
+      Architectures:
+        - x86_64
+      Description: Sends a Discord notification when a product is available
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            # Grants read access to Secrets Manager; used to retrieve Discord API key
+            SecretArn: !Ref DiscordApiKey
+      Environment:
+        Variables:
+          DISCORD_SECRET_ARN: !Ref DiscordApiKey
+          QUEUE_URL: !Ref InventoryUpdateQueue
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /
+            Method: POST
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt InventoryUpdateQueue.Arn
+
+  InventoryUpdateQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      QueueName: InventoryUpdateQueue.fifo
+      ContentBasedDeduplication: true
+
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: name
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+
+  InventoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      ProvisionedThroughput:
+        ReadCapacityUnits: 9
+        WriteCapacityUnits: 9
+
+  DiscordApiKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: 'This is the sensitive hash value that comes after "api/hooks/" in the Discord API key'
+      Name: DiscordApiKey
+      SecretString: '{"discord-api-key":"this-is-not-a-valid-key-please-replace"}'
+
+Outputs:
+  WebEndpoint:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
