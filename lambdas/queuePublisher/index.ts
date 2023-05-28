@@ -1,7 +1,7 @@
-import { ResponseError, ResponseSuccess } from "../lib/http.mjs";
+import { ResponseError, ResponseSuccess } from "../../plugins/http";
 import { Callback, Context } from "aws-lambda";
 import { DynamoDBRecord, DynamoDBStreamEvent } from "aws-lambda/trigger/dynamodb-stream";
-import { MySQSClient } from "../lib/sqs.mjs";
+import { MySQSClient } from "../../plugins/sqs";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
 
 const region = process.env.Region ? process.env.Region : 'us-east-1';

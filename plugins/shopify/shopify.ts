@@ -1,7 +1,7 @@
-import { getRequest } from '../http.mjs';
+import { getRequest } from '../http';
 import { RequestOptions } from "http";
-import { Product, Variant } from "./types.mjs";
-import { InventoryItem } from "../database/types.mjs";
+import { Product, Variant, ProductsListResponse, ProductHandle } from "./types";
+import { InventoryItem } from "../database/types";
 
 const fileExtensionMatchPattern = /\.[^/.]+$/; // RegEx to match file extensions like '.jpeg', '.js', '.html', etc.
 
@@ -47,14 +47,16 @@ export async function sendShopifyRequest (hostname: string, pathname: string) {
  * Parses a typical Shopify site response
  * @param {Product} product An array of Shopify stock summaries
  * @param {string} site The site from which the Shopify response was received
+ * @param productHandle
  * @returns An array of summary objects
  */
-export function processShopifyResponse (product: Product, site: string): InventoryItem[] {
+export function processShopifyResponse (product: Product, site: string, productHandle: string): InventoryItem[] {
   console.info('Executing shopify::processShopifyResponse');
 
   // Removes the trailing '.js' file extension from the site path. We don't want the hyperlink to open
   // client browser's to a blob of JSON; we want the browser to open to a pretty HTML page!
-  const hyperlink = site.replace(fileExtensionMatchPattern, '');
+  // const hyperlink = site.replace(fileExtensionMatchPattern, '');
+  const hyperlink = `${site}/products/${productHandle}`;
   console.debug(`shopify::processShopifyResponse - generating hyperlink: '${hyperlink}'`);
 
   const items: InventoryItem[] = []; // will be returned
@@ -102,4 +104,40 @@ export function processShopifyResponse (product: Product, site: string): Invento
   }
   console.debug(`Processed ${items.length} items.`);
   return items;
+}
+
+
+/**
+ * Sends an HTTP GET request to a Shopify site to fetch products list
+ * @param {*} hostname
+ * @returns
+ */
+export async function fetchAllProducts(hostname: string): Promise<ProductHandle[]> {
+  console.info(`Executing util::shopify::productsJson - hostname: '${hostname}'`);
+  if (!hostname) {
+    throw new Error('"hostname" must be defined');
+  }
+  const options: RequestOptions = {
+    host: hostname,
+    port: '443',
+    path: '/products.json',
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'application/json'
+    }
+  };
+
+  try {
+    // Send a request to the Shopify site
+    const response = await getRequest(options) as ProductsListResponse;
+    console.debug(`Shopify Products List Response is '${JSON.stringify(response)}'`);
+    return response.products.map(product => ({ handle: product.handle, id: product.id }));
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+  } catch (err: never) {
+    console.error('An error occurred while sending a Shopify products list request');
+    console.error(err?.message);
+    return [];
+  }
 }

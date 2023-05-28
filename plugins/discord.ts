@@ -1,4 +1,4 @@
-import { postRequest } from './http.mjs';
+import { postRequest } from './http';
 import {
   SecretsManagerClient,
   GetSecretValueCommand
@@ -43,6 +43,7 @@ export class Discord {
         })
       );
       console.debug('Key retrieval from vault success!');
+      console.debug('Secrets Manager Response: ', secretsManagerResponse);
     } catch (error) {
       console.error('Error', error);
       console.error('An error occurred while trying to retrieve the Discord API key.');
@@ -51,9 +52,14 @@ export class Discord {
 
     // Parse the discord api key
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const discordApiKey = JSON.parse(secretsManagerResponse.SecretString)['discord-api-key'];
+    let discordApiKey;
+    try{
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      discordApiKey = JSON.parse(secretsManagerResponse.SecretString)['discord-api-key'];
+    } catch(err) {
+      discordApiKey = secretsManagerResponse.SecretString;
+    }
 
     if (!discordApiKey) {
       throw new Error('Discord API key not found.');

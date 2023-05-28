@@ -1,6 +1,6 @@
 import { Context, APIGatewayProxyCallback, APIGatewayEvent } from 'aws-lambda';
-import { putItem } from '../lib/database/ddbdoc-put-item.mjs';
-import { ResponseError, ResponseSuccess } from "../lib/http.mjs";
+import { putItem } from '../../plugins/database/ddbdoc-put-item';
+import { ResponseError, ResponseSuccess } from "../../plugins/http";
 
 // Get environment variables - set by CloudFormation/SAM
 

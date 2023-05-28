@@ -1,9 +1,9 @@
-import * as Shopify from '../lib/shopify/shopify.mjs';
-import { Product } from '../lib/shopify/types.mjs';
-import { Database } from '../lib/database/index.mjs';
-import { ResponseError, ResponseSuccess } from '../lib/http.mjs';
+import * as Shopify from '../../plugins/shopify/shopify';
+import { Product } from '../../plugins/shopify/types';
+import { Database } from '../../plugins/database';
+import { ResponseSuccess } from '../../plugins/http';
 import { APIGatewayEvent, APIGatewayProxyCallback, Context } from 'aws-lambda';
-import { InventoryItem } from "../lib/database/types.mjs";
+import { InventoryItem } from "../../plugins/database/types";
 
 
 // Get environment variables - set by CloudFormation/SAM
@@ -27,12 +27,10 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   console.info('Received event:', event);
 
   if (event.httpMethod !== 'POST') {
-    // throw new Error(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
-    console.warn(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
+    console.warn(`ShopifySyncFunction only accepts POST requests. You tried: ${event.httpMethod}. This may not work in the future.`);
   }
   if (event.path !== '/sync') {
-    // throw new Error(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
-    console.warn(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
+    console.warn(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}". This may not work in the future.`);
   }
 
   // Retrieve the list of Shopify site URLs to check from the ConfigTable
@@ -46,32 +44,29 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   }
 
   let allItems: InventoryItem[] = [];
+
   // Get the content from the Shopify site(s)
   for (const site of sites) {
-    // Parse the host and path from the full website URL
-    const { pathname, hostname } = new URL(site);
     try {
-      // Send a GET request to the website for a list of inventory
-      const shopifyResponse: Product = await Shopify.sendShopifyRequest(hostname, pathname);
-      // Parse the list of inventory response
-      const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site);
-      // Merge the list into the master list which will be returned when the function has completed processing
-      allItems = allItems.concat(listOfStockItems);
-      try {
-        // Add each item retrieved to the database table
-        for (const item of listOfStockItems) {
-          /**
-           * Write the content to the database.
-           * Each item will be structured like:
-           * { id: number, title: str, available: bool, quantity: number, site: str }
-           */
-          await Database.putItem(inventoryTableName, item);
-        }
-        // @ts-ignore
-      } catch(err: Error) {
-        console.warn(`There was an error while trying to put item in database.`);
-        console.error(err.message);
-      }
+      const { hostname } = new URL(site);
+
+      // Get product handles and their corresponding IDs
+      const productHandles = await Shopify.fetchAllProducts(hostname);
+
+      // Send a GET request to the website for a list of inventory and update the database in parallel
+      const requests = productHandles.map(async (productHandle: { handle: string; }) => {
+        const productPath = `/products/${productHandle.handle}.js`;
+        const shopifyResponse: Product = await Shopify.sendShopifyRequest(hostname, productPath);
+        const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site, productHandle.handle);
+        allItems = allItems.concat(listOfStockItems);
+      });
+
+      // Wait for all the requests to complete
+      await Promise.all(requests);
+
+      // After all items are retrieved from the site, add them to the database table in a batch operation
+      await Database.batchPutItems(inventoryTableName, allItems);
+
       // @ts-ignore
     } catch(err: Error) {
       console.warn(`There was an error while sending a Shopify request to ${site}.`);

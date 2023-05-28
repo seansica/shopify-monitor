@@ -3,12 +3,10 @@ Description: >-
   shopify-bot
 
 Transform:
-- AWS::Serverless-2016-10-31
+  - AWS::Serverless-2016-10-31
 
 Globals:
   Function:
-    Layers:
-      - !Ref RuntimeDependenciesLayer
     Environment:
       Variables:
         Region: 'us-east-1'
@@ -20,11 +18,9 @@ Resources:
 
   ConfigFunction:
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
     Properties:
-      CodeUri: .
-      Handler: dist/handlers/config.handler
+      CodeUri: lambdas/config
+      Handler: index.handler
       Architectures:
         - x86_64
       Description: Stores Shopify sites and Discord webhook parameters (excluding the secure API key - that is stored in Secrets Manager)
@@ -44,17 +40,15 @@ Resources:
 
   ShopifySyncFunction:
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
     Properties:
-      CodeUri: .
-      Handler: dist/handlers/shopify-sync.handler
+      CodeUri: lambdas/shopifySync
+      Handler: index.handler
       Timeout: 15
       Architectures:
         - x86_64
       Description: Scans Shopify sites and writes updates to a DynamoDB table
       Policies:
-          # Give Create/Read/Update/Delete Permissions to the InventoryTable
+        # Give Create/Read/Update/Delete Permissions to the InventoryTable
         - DynamoDBCrudPolicy:
             TableName: !Ref InventoryTable
         - DynamoDBCrudPolicy:
@@ -79,16 +73,14 @@ Resources:
             Description: Schedules the ShopifySyncFunction to run every 5 minutes
             Enabled: true
             RetryPolicy:
-                MaximumEventAgeInSeconds: 86400
-                MaximumRetryAttempts: 185
+              MaximumEventAgeInSeconds: 86400
+              MaximumRetryAttempts: 185
 
   QueuePublisherFunction:
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
     Properties:
-      CodeUri: .
-      Handler: dist/handlers/queue-publisher.handler
+      CodeUri: lambdas/queuePublisher
+      Handler: index.handler
       Architectures:
         - x86_64
       Policies:
@@ -113,21 +105,11 @@ Resources:
             BatchSize: 1
             Enabled: true
 
-  InventoryUpdateQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      FifoQueue: true
-      QueueName: InventoryUpdateQueue.fifo
-      ContentBasedDeduplication: true
-
   DiscordNotifierFunction:
-    # This Lambda function sends Discord messages via HTTP webhook
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: makefile
     Properties:
-      CodeUri: .
-      Handler: dist/handlers/discord-notifier.handler
+      CodeUri: lambdas/discordNotifier
+      Handler: index.handler
       Architectures:
         - x86_64
       Description: Sends a Discord notification when a product is available
@@ -150,16 +132,12 @@ Resources:
           Properties:
             Queue: !GetAtt InventoryUpdateQueue.Arn
 
-  RuntimeDependenciesLayer:
-    Type: AWS::Serverless::LayerVersion
-    Metadata:
-      BuildMethod: makefile
+  InventoryUpdateQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      Description: Runtime dependencies for Lambdas
-      ContentUri: ./
-      CompatibleRuntimes:
-        - nodejs18.x
-      RetentionPolicy: Retain
+      FifoQueue: true
+      QueueName: InventoryUpdateQueue.fifo
+      ContentBasedDeduplication: true
 
   ConfigTable:
     Type: AWS::DynamoDB::Table
@@ -188,8 +166,8 @@ Resources:
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
       ProvisionedThroughput:
-        ReadCapacityUnits: 2
-        WriteCapacityUnits: 2
+        ReadCapacityUnits: 9
+        WriteCapacityUnits: 9
 
   DiscordApiKey:
     Type: AWS::SecretsManager::Secret

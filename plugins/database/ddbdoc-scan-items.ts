@@ -1,4 +1,4 @@
-import { ddbDocClient } from "./ddb-doc-client.mjs";
+import { ddbDocClient } from "./ddb-doc-client";
 import { ScanCommandInput, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 export const scanItems = async (tableName: string) => {
