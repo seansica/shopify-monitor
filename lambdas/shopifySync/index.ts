@@ -1,9 +1,9 @@
-import * as Shopify from '../lib/shopify/shopify.mjs';
-import { Product } from '../lib/shopify/types.mjs';
-import { Database } from '../lib/database/index.mjs';
-import { ResponseSuccess } from '../lib/http.mjs';
+import * as Shopify from '../../plugins/shopify/shopify';
+import { Product } from '../../plugins/shopify/types';
+import { Database } from '../../plugins/database';
+import { ResponseSuccess } from '../../plugins/http';
 import { APIGatewayEvent, APIGatewayProxyCallback, Context } from 'aws-lambda';
-import { InventoryItem } from "../lib/database/types.mjs";
+import { InventoryItem } from "../../plugins/database/types";
 
 
 // Get environment variables - set by CloudFormation/SAM
@@ -13,10 +13,6 @@ const configTableName = process.env.CONFIG_TABLE;
 if (!inventoryTableName) throw new Error('INVENTORY_TABLE must be defined.')
 if (!configTableName) throw new Error('CONFIG_TABLE must be defined.');
 
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /**
  * A simple example includes an HTTP get method to get all items from a DynamoDB table.
@@ -31,12 +27,10 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   console.info('Received event:', event);
 
   if (event.httpMethod !== 'POST') {
-    // throw new Error(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
-    console.warn(`ShopifySyncFunction only accept GET method. You tried: ${event.httpMethod}`);
+    console.warn(`ShopifySyncFunction only accepts POST requests. You tried: ${event.httpMethod}. This may not work in the future.`);
   }
   if (event.path !== '/sync') {
-    // throw new Error(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
-    console.warn(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}"`);
+    console.warn(`ShopifySyncFunction only accepts requests on path "/sync". You tried: "${event.path}". This may not work in the future.`);
   }
 
   // Retrieve the list of Shopify site URLs to check from the ConfigTable
@@ -59,26 +53,19 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
       // Get product handles and their corresponding IDs
       const productHandles = await Shopify.fetchAllProducts(hostname);
 
-
       // Send a GET request to the website for a list of inventory and update the database in parallel
       const requests = productHandles.map(async (productHandle: { handle: string; }) => {
         const productPath = `/products/${productHandle.handle}.js`;
         const shopifyResponse: Product = await Shopify.sendShopifyRequest(hostname, productPath);
-        const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site);
+        const listOfStockItems: InventoryItem[] = Shopify.processShopifyResponse(shopifyResponse, site, productHandle.handle);
         allItems = allItems.concat(listOfStockItems);
-
-        // Add each item retrieved to the database table
-        for (const item of listOfStockItems) {
-          await Database.putItem(inventoryTableName, item);
-          // Introduce a delay of 100 milliseconds between requests to avoid:
-          // Error ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table
-          // was exceeded. Consider increasing your provisioning level with the UpdateTable API.
-          await sleep(100);
-        }
       });
 
       // Wait for all the requests to complete
       await Promise.all(requests);
+
+      // After all items are retrieved from the site, add them to the database table in a batch operation
+      await Database.batchPutItems(inventoryTableName, allItems);
 
       // @ts-ignore
     } catch(err: Error) {
