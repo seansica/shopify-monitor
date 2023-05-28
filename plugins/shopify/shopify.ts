@@ -1,7 +1,7 @@
-import { getRequest } from '../http.mjs';
+import { getRequest } from '../http';
 import { RequestOptions } from "http";
-import { Product, Variant, ProductsListResponse, ProductHandle } from "./types.mjs";
-import { InventoryItem } from "../database/types.mjs";
+import { Product, Variant, ProductsListResponse, ProductHandle } from "./types";
+import { InventoryItem } from "../database/types";
 
 const fileExtensionMatchPattern = /\.[^/.]+$/; // RegEx to match file extensions like '.jpeg', '.js', '.html', etc.
 
@@ -47,14 +47,16 @@ export async function sendShopifyRequest (hostname: string, pathname: string) {
  * Parses a typical Shopify site response
  * @param {Product} product An array of Shopify stock summaries
  * @param {string} site The site from which the Shopify response was received
+ * @param productHandle
  * @returns An array of summary objects
  */
-export function processShopifyResponse (product: Product, site: string): InventoryItem[] {
+export function processShopifyResponse (product: Product, site: string, productHandle: string): InventoryItem[] {
   console.info('Executing shopify::processShopifyResponse');
 
   // Removes the trailing '.js' file extension from the site path. We don't want the hyperlink to open
   // client browser's to a blob of JSON; we want the browser to open to a pretty HTML page!
-  const hyperlink = site.replace(fileExtensionMatchPattern, '');
+  // const hyperlink = site.replace(fileExtensionMatchPattern, '');
+  const hyperlink = `${site}/products/${productHandle}`;
   console.debug(`shopify::processShopifyResponse - generating hyperlink: '${hyperlink}'`);
 
   const items: InventoryItem[] = []; // will be returned

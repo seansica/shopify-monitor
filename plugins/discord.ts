@@ -1,4 +1,4 @@
-import { postRequest } from './http.mjs';
+import { postRequest } from './http';
 import {
   SecretsManagerClient,
   GetSecretValueCommand
