@@ -1,7 +1,7 @@
-import { Discord } from '../lib/discord.mjs';
-import { ResponseSuccess, ResponseError } from '../lib/http.mjs';
+import { Discord } from '../../plugins/discord';
+import { ResponseSuccess, ResponseError } from '../../plugins/http';
 import { APIGatewayProxyCallback, Context, SQSEvent } from "aws-lambda";
-import { MySQSClient } from "../lib/sqs.mjs";
+import { MySQSClient } from "../../plugins/sqs";
 
 // Initialize Discord client
 const secretArn = process.env.DISCORD_SECRET_ARN;
