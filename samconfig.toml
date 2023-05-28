@@ -10,6 +10,7 @@ confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
 profile = "AdministratorAccess-328571739532"
+template_file = "template.prod.yaml"
 
 [dev]
 [dev.deploy]
@@ -22,3 +23,4 @@ confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
 profile = "AdministratorAccess-328571739532"
+template_file = "template.dev.yaml"
